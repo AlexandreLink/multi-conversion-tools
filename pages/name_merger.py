@@ -32,12 +32,13 @@ if file_rem and file_changes:
         )
 
         # Trier les noms par ordre alphabétique
-        sorted_names = sorted(df_rem['Nom Complet'].unique())
+        sorted_names = [name.strip() for name in sorted(df_rem['Nom Complet'].unique())]
 
         # Créer un document Word et ajouter les noms
         doc = Document()
         doc.add_heading("Remerciements", 0)
         doc.add_paragraph(", ".join(sorted_names))
+
 
         # Enregistrer le fichier Word dans un flux de mémoire pour le téléchargement
         buffer = BytesIO()
