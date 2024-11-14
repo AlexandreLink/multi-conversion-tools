@@ -26,4 +26,4 @@ selected_gif = random.choice(gif_urls)
 # Afficher le GIF aléatoire
 st.image(selected_gif, use_column_width=True)
 
-st.write("Bienvenue ! Veuillez sélectionner un outil pour commencer.")
+st.write("Bienvenue ! Veuillez sélectionner un outil pour commencer. Ils sont dans la side bar a gauche !")
