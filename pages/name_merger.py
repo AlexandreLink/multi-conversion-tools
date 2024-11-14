@@ -3,7 +3,7 @@ import pandas as pd
 from io import BytesIO
 from docx import Document
 
-st.set_page_config(page_title="ABO JVM Csv->Excel")
+
 
 st.title("Fusion de Noms pour Remerciements")
 
