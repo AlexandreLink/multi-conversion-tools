@@ -51,7 +51,6 @@ def process_csv(csv_file):
     return df
 
 # Interface Streamlit
-st.set_page_config(page_title="ABO JVM Csv->Excel")
 st.title("Convertisseur CSV vers Excel et Traitement des Données")
 
 # Demander le nom de fichier à l'utilisateur
