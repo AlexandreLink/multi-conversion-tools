@@ -5,19 +5,19 @@ st.title("Accueil - Outils de Conversion Multi-Usage")
 
 # Liste d'URLs de GIFs
 gif_urls = [
-    "https://tenor.com/fr/view/rickroll-bailu-gif-13109126276794815880",
-    "https://tenor.com/fr/view/sonfys-shrek-gif-15350610703372212021",
-    "https://tenor.com/fr/view/at-your-service-pirates-of-the-carribean-johnny-depp-gif-12788009",
-    "https://tenor.com/fr/view/donkey-help-you-how-can-i-help-ya-gif-13880120391864654636",
-    "https://tenor.com/fr/view/seth-mc-farland-so-what-can-i-do-for-you-orville-sarcasm-gif-12154903",
-    "https://tenor.com/fr/view/hi-hello-there-hello-sup-swag-gif-17652416",
-    "https://tenor.com/fr/view/michael-scott-wassup-wassupmybrotha-michaelscott-gif-22017221",
-    "https://tenor.com/fr/view/dog-puppy-cute-puppy-puppy-dance-adorable-gif-12449937729095510856",
-    "https://tenor.com/fr/view/lost-smile-john-locke-gif-15217431594641756946",
-    "https://tenor.com/fr/view/truffleshuffle-gif-4570445",
-    "https://tenor.com/fr/view/lost-jin-thumbs-up-gif-26707920",
-    "https://tenor.com/fr/view/hello-there-hi-there-greetings-gif-9442662",
-    "https://tenor.com/fr/view/to-the-right-tyga-krabby-step-song-follow-my-lead-move-to-my-right-gif-19169357"
+    "https://media1.tenor.com/m/tez45MQYFYgAAAAd/rickroll-bailu.gif",
+    "https://media1.tenor.com/m/1QhTGovPVzUAAAAd/sonfys-shrek.gif",
+    "https://media1.tenor.com/m/OoVbm9PgjHwAAAAd/at-your-service-pirates-of-the-carribean.gif",
+    "https://media1.tenor.com/m/wKAX9NS_mywAAAAd/donkey-help-you.gif",
+    "https://media1.tenor.com/m/QNGf0Ni59BAAAAAd/seth-mc-farland-so-what-can-i-do-for-you.gif",
+    "https://media1.tenor.com/m/wfQoupcZhF0AAAAd/hi-hello-there.gif",
+    "https://media1.tenor.com/m/cmYNlN-e2GsAAAAd/michael-scott.gif",
+    "https://media1.tenor.com/m/rMcQZup4q0gAAAAd/dog-puppy.gif",
+    "https://media1.tenor.com/m/0y8taPBtkxIAAAAd/lost-smile.gif",
+    "https://media1.tenor.com/m/TytKdgDpA4kAAAAd/truffleshuffle.gif",
+    "https://media1.tenor.com/m/sLnbxLK4MDAAAAAd/lost-jin.gif",
+    "https://media1.tenor.com/m/6us3et_6HDoAAAAd/hello-there-hi-there.gif",
+    "https://media1.tenor.com/m/q8iHGRuR3a8AAAAd/to-the-right-tyga.gif"
 ]
 
 # Sélectionner un GIF aléatoire
