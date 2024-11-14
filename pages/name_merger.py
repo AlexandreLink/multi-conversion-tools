@@ -5,11 +5,14 @@ from docx import Document
 
 st.title("Fusion de Noms pour Remerciements")
 
+# Champ pour entrer le nom du fichier Word
+file_name = st.text_input("Entrez le nom du fichier Word à télécharger (sans extension) :")
+
 # Téléversement des deux fichiers Excel, acceptant à la fois .xls et .xlsx
 file_rem = st.file_uploader("Téléversez le fichier de remerciements (Excel)", type=["xls", "xlsx"])
 file_changes = st.file_uploader("Téléversez le fichier de changements de noms (Excel)", type=["xls", "xlsx"])
 
-if file_rem and file_changes:
+if file_rem and file_changes and file_name:
     # Charger les deux fichiers
     df_rem = pd.read_excel(file_rem)
     df_changes = pd.read_excel(file_changes)
@@ -31,7 +34,7 @@ if file_rem and file_changes:
             lambda row: replacements.get(row['Reference'], f"{row['Prénom']} {row['Nom']}"), axis=1
         )
 
-        # Trier les noms par ordre alphabétique
+        # Trier les noms par ordre alphabétique et nettoyer les espaces superflus
         sorted_names = [name.strip() for name in sorted(df_rem['Nom Complet'].unique())]
 
         # Créer un document Word et ajouter les noms
@@ -39,16 +42,16 @@ if file_rem and file_changes:
         doc.add_heading("Remerciements", 0)
         doc.add_paragraph(", ".join(sorted_names))
 
-
         # Enregistrer le fichier Word dans un flux de mémoire pour le téléchargement
         buffer = BytesIO()
         doc.save(buffer)
         buffer.seek(0)
 
-        # Bouton de téléchargement pour le fichier Word
+        # Bouton de téléchargement pour le fichier Word avec nom personnalisé
+        word_file_name = f"{file_name}.docx"  # Ajouter l'extension .docx
         st.download_button(
             label="Télécharger le fichier de remerciements (Word)",
             data=buffer,
-            file_name="Remerciements.docx",
+            file_name=word_file_name,
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
