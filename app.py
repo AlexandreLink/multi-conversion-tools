@@ -24,6 +24,6 @@ gif_urls = [
 selected_gif = random.choice(gif_urls)
 
 # Afficher le GIF aléatoire
-st.image(selected_gif, width=300)  # Ajustez la largeur selon vos préférences
+st.image(selected_gif, width=400)  # Ajustez la largeur selon vos préférences
 
 st.write("Bienvenue ! Veuillez sélectionner un outil pour commencer. Ils sont dans la side bar a gauche !")
