@@ -33,27 +33,34 @@ if file_rem and file_changes and file_name:
 
         # Appliquer les remplacements
         df_rem['Nom Complet'] = df_rem.apply(
-            lambda row: replacements.get(row['Reference'], f"{row['Prénom']} {row['Nom']}"), axis=1
-        )
+        lambda row: replacements.get(row['Reference'], f"{row['Prénom']} {row['Nom']}"), axis=1
+    )
 
-        # Trier les noms par ordre alphabétique et nettoyer les espaces superflus
-        sorted_names = [name.strip() for name in sorted(df_rem['Nom Complet'].unique())]
+    # Trier les noms par ordre alphabétique basé sur le nom de famille
+    sorted_names = sorted(
+        df_rem['Nom Complet'].unique(),
+        key=lambda x: x.split()[-1].strip().upper()  # Trie par le dernier mot (nom de famille)
+    )
 
-        # Créer un document Word et ajouter les noms
-        doc = Document()
-        doc.add_heading("Remerciements", 0)
-        doc.add_paragraph(", ".join(sorted_names))
+    # Nettoyer les espaces superflus
+    sorted_names = [name.strip() for name in sorted_names]
 
-        # Enregistrer le fichier Word dans un flux de mémoire pour le téléchargement
-        buffer = BytesIO()
-        doc.save(buffer)
-        buffer.seek(0)
+    # Créer un document Word et ajouter les noms
+    doc = Document()
+    doc.add_heading("Remerciements", 0)
+    doc.add_paragraph(", ".join(sorted_names))
 
-        # Bouton de téléchargement pour le fichier Word avec nom personnalisé
-        word_file_name = f"{file_name}.docx"  # Ajouter l'extension .docx
-        st.download_button(
-            label="Télécharger le fichier de remerciements (Word)",
-            data=buffer,
-            file_name=word_file_name,
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        )
+
+    # Enregistrer le fichier Word dans un flux de mémoire pour le téléchargement
+    buffer = BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+
+    # Bouton de téléchargement pour le fichier Word avec nom personnalisé
+    word_file_name = f"{file_name}.docx"  # Ajouter l'extension .docx
+    st.download_button(
+        label="Télécharger le fichier de remerciements (Word)",
+        data=buffer,
+        file_name=word_file_name,
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
