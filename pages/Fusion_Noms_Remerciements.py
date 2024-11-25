@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from io import BytesIO
 from docx import Document
+import unicodedata
 
 st.title("Fusion de Noms pour Remerciements")
 
@@ -34,10 +35,19 @@ if file_rem and file_changes and file_name:
             lambda row: replacements.get(row['Reference'], f"{row['Prénom']} {row['Nom']}"), axis=1
         )
 
-        # Trier les noms par ordre alphabétique basé sur le prénom
+        # Fonction de tri avec gestion des accents
+        def normalize_sort_key(name):
+            # Séparer le prénom pour trier uniquement par celui-ci
+            prenom = name.split()[0]
+            # Normaliser les caractères Unicode (transforme É en E mais conserve l'ordre accentué correct)
+            normalized = unicodedata.normalize('NFD', prenom)
+            # Supprimer les diacritiques pour le tri tout en conservant l'original
+            return ''.join(c for c in normalized if unicodedata.category(c) != 'Mn').upper()
+
+        # Trier les noms par ordre alphabétique basé sur le prénom (avec gestion des accents)
         sorted_names = sorted(
             df_rem['Nom Complet'].unique(),
-            key=lambda x: x.split()[0].strip().upper()  # Trie par le premier mot (prénom)
+            key=normalize_sort_key
         )
 
         # Nettoyer les espaces superflus
