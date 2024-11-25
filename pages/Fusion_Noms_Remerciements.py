@@ -35,6 +35,9 @@ if file_rem and file_changes and file_name:
             lambda row: replacements.get(row['Reference'], f"{row['Prénom']} {row['Nom']}"), axis=1
         )
 
+        # Suppression des doublons dans la colonne "Nom Complet"
+        unique_names = df_rem['Nom Complet'].drop_duplicates()
+
         # Fonction de tri avec gestion des accents
         def normalize_sort_key(name):
             # Séparer le prénom pour trier uniquement par celui-ci
@@ -46,7 +49,7 @@ if file_rem and file_changes and file_name:
 
         # Trier les noms par ordre alphabétique basé sur le prénom (avec gestion des accents)
         sorted_names = sorted(
-            df_rem['Nom Complet'].unique(),
+            unique_names.unique(),  # Utiliser uniquement les noms uniques
             key=normalize_sort_key
         )
 
@@ -71,3 +74,8 @@ if file_rem and file_changes and file_name:
             file_name=word_file_name,
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
+
+        # Afficher un message si des doublons ont été trouvés
+        duplicate_count = len(df_rem['Nom Complet']) - len(unique_names)
+        if duplicate_count > 0:
+            st.warning(f"{duplicate_count} doublon(s) détecté(s) et supprimé(s) du fichier final.")
