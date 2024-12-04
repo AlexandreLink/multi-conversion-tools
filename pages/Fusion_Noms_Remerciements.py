@@ -35,8 +35,15 @@ if file_rem and file_changes and file_name:
             lambda row: replacements.get(row['Reference'], f"{row['Prénom']} {row['Nom']}"), axis=1
         )
 
-        # Suppression des doublons dans la colonne "Nom Complet"
-        unique_names = df_rem['Nom Complet'].drop_duplicates()
+        # Détecter les doublons dans la liste des noms complets
+        duplicates = df_rem['Nom Complet'][df_rem['Nom Complet'].duplicated(keep=False)]
+        if not duplicates.empty:
+            st.warning("Attention : Des doublons ont été détectés dans les noms complets. Veuillez vérifier les données.")
+            st.write(f"Nombre de doublons détectés : {len(duplicates)}")
+            st.dataframe(duplicates.drop_duplicates(), use_container_width=True)
+
+        # Supprimer les doublons
+        df_rem = df_rem.drop_duplicates(subset=['Nom Complet'])
 
         # Fonction de tri avec gestion des accents
         def normalize_sort_key(name):
@@ -49,7 +56,7 @@ if file_rem and file_changes and file_name:
 
         # Trier les noms par ordre alphabétique basé sur le prénom (avec gestion des accents)
         sorted_names = sorted(
-            unique_names.unique(),  # Utiliser uniquement les noms uniques
+            df_rem['Nom Complet'].unique(),
             key=normalize_sort_key
         )
 
@@ -74,8 +81,3 @@ if file_rem and file_changes and file_name:
             file_name=word_file_name,
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
-
-        # Afficher un message si des doublons ont été trouvés
-        duplicate_count = len(df_rem['Nom Complet']) - len(unique_names)
-        if duplicate_count > 0:
-            st.warning(f"{duplicate_count} doublon(s) détecté(s) et supprimé(s) du fichier final.")
