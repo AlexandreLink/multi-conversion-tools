@@ -27,10 +27,10 @@ def process_csv(csv_file):
                        "Delivery country code", "Billing country", "Delivery interval count"]
     df = df[columns_to_keep]
 
-    # 6. Ajouter une colonne corrigée pour "Billing country"
-    df['Billing country corrected'] = df.apply(
-        lambda row: row['Billing country'] if pd.notnull(row['Billing country']) and row['Billing country'] != "" 
-        else ("FRANCE" if row['Delivery country code'] == "FR" else "UNKNOWN"),
+    # 6. Corriger la colonne 'Billing country' directement si vide ou manquante
+    df['Billing country'] = df.apply(
+        lambda row: "FRANCE" if (pd.isnull(row['Billing country']) or row['Billing country'].strip() == "") 
+        and row['Delivery country code'] == "FR" else row['Billing country'],
         axis=1
     )
 
@@ -44,7 +44,7 @@ def process_csv(csv_file):
         "Delivery city": "Delivery city",
         "Delivery province code": "Delivery province code",
         "Delivery country code": "Delivery country code",
-        "Billing country corrected": "Billing country",
+        "Billing country": "Billing country",
         "Delivery interval count": "Quantity"
     }
     df = df.rename(columns=column_mapping)
@@ -75,13 +75,13 @@ if uploaded_file and file_name:
         st.write("Aperçu des données après traitement :")
         st.dataframe(df_processed.head())
 
-        # Séparer les données en deux groupes : France et Reste du monde
+        # Séparer les données en deux groupes : France et Reste du Monde
         df_france = df_processed[df_processed['Billing country'] == "FRANCE"]
         df_rest_of_world = df_processed[df_processed['Billing country'] != "FRANCE"]
 
         # Enregistrer les fichiers avec les noms personnalisés
         france_file_name = f"{file_name}_FRANCE.xlsx"
-        rest_of_world_file_name = f"{file_name}_ETRANGER.xlsx"
+        rest_of_world_file_name = f"{file_name}_Rest_of_World.xlsx"
 
         # Sauvegarder le fichier pour la France
         df_france.to_excel(france_file_name, index=False)
@@ -97,7 +97,7 @@ if uploaded_file and file_name:
         df_rest_of_world.to_excel(rest_of_world_file_name, index=False)
         with open(rest_of_world_file_name, "rb") as file:
             st.download_button(
-                label="Télécharger le fichier Étranger",
+                label="Télécharger le fichier Reste du Monde",
                 data=file,
                 file_name=rest_of_world_file_name,
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
