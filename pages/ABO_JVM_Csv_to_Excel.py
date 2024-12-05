@@ -27,7 +27,14 @@ def process_csv(csv_file):
                        "Delivery country code", "Billing country", "Delivery interval count"]
     df = df[columns_to_keep]
 
-    # 6. Renommer les colonnes pour correspondre aux noms finaux et ordonner
+    # 6. Ajouter une colonne corrigée pour "Billing country"
+    df['Billing country corrected'] = df.apply(
+        lambda row: row['Billing country'] if pd.notnull(row['Billing country']) and row['Billing country'] != "" 
+        else ("FRANCE" if row['Delivery country code'] == "FR" else "UNKNOWN"),
+        axis=1
+    )
+
+    # 7. Renommer les colonnes pour correspondre aux noms finaux et ordonner
     column_mapping = {
         "ID": "Customer ID",
         "Customer name": "Delivery name",
@@ -37,7 +44,7 @@ def process_csv(csv_file):
         "Delivery city": "Delivery city",
         "Delivery province code": "Delivery province code",
         "Delivery country code": "Delivery country code",
-        "Billing country": "Billing country",
+        "Billing country corrected": "Billing country",
         "Delivery interval count": "Quantity"
     }
     df = df.rename(columns=column_mapping)
@@ -74,7 +81,7 @@ if uploaded_file and file_name:
 
         # Enregistrer les fichiers avec les noms personnalisés
         france_file_name = f"{file_name}_FRANCE.xlsx"
-        rest_of_world_file_name = f"{file_name}_Rest_of_World.xlsx"
+        rest_of_world_file_name = f"{file_name}_ETRANGER.xlsx"
 
         # Sauvegarder le fichier pour la France
         df_france.to_excel(france_file_name, index=False)
@@ -90,7 +97,7 @@ if uploaded_file and file_name:
         df_rest_of_world.to_excel(rest_of_world_file_name, index=False)
         with open(rest_of_world_file_name, "rb") as file:
             st.download_button(
-                label="Télécharger le fichier Reste du Monde",
+                label="Télécharger le fichier Étranger",
                 data=file,
                 file_name=rest_of_world_file_name,
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
