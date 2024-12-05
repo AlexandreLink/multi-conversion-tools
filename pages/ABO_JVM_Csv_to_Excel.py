@@ -76,12 +76,12 @@ if uploaded_file and file_name:
         st.dataframe(df_processed.head())
 
         # Séparer les données en deux groupes : France et Reste du Monde
-        df_france = df_processed[df_processed['Billing country'] == "FRANCE"]
-        df_rest_of_world = df_processed[df_processed['Billing country'] != "FRANCE"]
+        df_france = df_processed[df_processed['Delivery country code'] == "FR"]
+        df_rest_of_world = df_processed[df_processed['Delivery country code'] != "FR"]
 
         # Enregistrer les fichiers avec les noms personnalisés
         france_file_name = f"{file_name}_FRANCE.xlsx"
-        rest_of_world_file_name = f"{file_name}_Rest_of_World.xlsx"
+        rest_of_world_file_name = f"{file_name}_ETRANGER.xlsx"
 
         # Sauvegarder le fichier pour la France
         df_france.to_excel(france_file_name, index=False)
@@ -97,7 +97,7 @@ if uploaded_file and file_name:
         df_rest_of_world.to_excel(rest_of_world_file_name, index=False)
         with open(rest_of_world_file_name, "rb") as file:
             st.download_button(
-                label="Télécharger le fichier Reste du Monde",
+                label="Télécharger le fichier Étranger",
                 data=file,
                 file_name=rest_of_world_file_name,
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
