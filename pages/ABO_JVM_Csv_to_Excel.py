@@ -11,12 +11,12 @@ def process_csv(csv_file):
 
     # 3. Créer la date limite au format du CSV (ex. "2024-11-04T23:59:59+01:00")
     today = datetime.today()
-    date_limite_str = f"{today.year}-{today.month:02d}-04T23:59:59+01:00"
+    date_limite = datetime(today.year, today.month, 4, 23, 59, 59)  # Objet datetime pour comparaison
 
-    # 4. Filtrer les lignes avec des dates 'Created at' <= date_limite_str
+    # 4. Filtrer les lignes avec des dates 'Created at' <= date_limite
     if 'Created at' in df.columns:
         df['Created at'] = pd.to_datetime(df['Created at'], errors='coerce')
-        df = df[df['Created at'] <= date_limite_str]
+        df = df[df['Created at'] <= date_limite]
         # Supprimer la colonne 'Created at' après le filtrage
         df = df.drop(columns=['Created at'], errors='ignore')
     else:
@@ -101,7 +101,7 @@ if uploaded_file and file_name:
                 label="Télécharger le fichier France",
                 data=file,
                 file_name=france_file_name,
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             )
 
         # Sauvegarder le fichier pour le reste du monde
@@ -111,5 +111,5 @@ if uploaded_file and file_name:
                 label="Télécharger le fichier Étranger",
                 data=file,
                 file_name=rest_of_world_file_name,
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             )
