@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 
 def process_csv(csv_file):
     # 1. Lire le fichier CSV avec toutes les colonnes
@@ -15,26 +15,37 @@ def process_csv(csv_file):
 
     # 4. Filtrer les lignes avec des dates 'Created at' <= date_limite_str
     if 'Created at' in df.columns:
+        df['Created at'] = pd.to_datetime(df['Created at'], errors='coerce')
         df = df[df['Created at'] <= date_limite_str]
         # Supprimer la colonne 'Created at' après le filtrage
         df = df.drop(columns=['Created at'], errors='ignore')
     else:
         st.error("Le fichier CSV ne contient pas de colonne 'Created at' pour les dates de commande.")
 
-    # 5. Garder uniquement les colonnes spécifiées
-    columns_to_keep = ["ID", "Customer name", "Delivery address 1", "Delivery address 2", 
-                       "Delivery zip", "Delivery city", "Delivery province code", 
-                       "Delivery country code", "Billing country", "Delivery interval count"]
-    df = df[columns_to_keep]
-
-    # 6. Corriger la colonne 'Billing country' directement si vide ou manquante
+    # 5. Corriger la colonne 'Billing country' directement si vide ou manquante
     df['Billing country'] = df.apply(
         lambda row: "FRANCE" if (pd.isnull(row['Billing country']) or row['Billing country'].strip() == "") 
         and row['Delivery country code'] == "FR" else row['Billing country'],
         axis=1
     )
 
-    # 7. Renommer les colonnes pour correspondre aux noms finaux et ordonner
+    # 6. Gestion des abonnements annulés basés sur "Next Order"
+    if 'Next Order' in df.columns:
+        df['Next Order'] = pd.to_datetime(df['Next Order'], errors='coerce')
+        start_date = today.replace(day=5)
+        end_date = (start_date + pd.offsets.MonthEnd(1)).replace(day=4)
+        df = df[(df['Next Order'] >= start_date) | (df['Next Order'].isnull())]
+
+    # 7. Garder uniquement les colonnes spécifiées
+    columns_to_keep = ["ID", "Customer name", "Delivery address 1", "Delivery address 2", 
+                       "Delivery zip", "Delivery city", "Delivery province code", 
+                       "Delivery country code", "Billing country", "Delivery interval count"]
+    df = df[columns_to_keep]
+
+    # 8. Supprimer les doublons
+    df = df.drop_duplicates()
+
+    # 9. Renommer les colonnes pour correspondre aux noms finaux et ordonner
     column_mapping = {
         "ID": "Customer ID",
         "Customer name": "Delivery name",
