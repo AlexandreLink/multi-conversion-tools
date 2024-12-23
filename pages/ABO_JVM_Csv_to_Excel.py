@@ -9,14 +9,21 @@ def process_csv(csv_file):
     # 2. Mettre toutes les valeurs en majuscules
     df = df.applymap(lambda x: x.upper() if isinstance(x, str) else x)
 
-    # 3. Créer la date limite au format du CSV (ex. "2024-11-04T23:59:59+01:00")
+    # 3. Créer la date limite au format datetime
     today = datetime.today()
     date_limite = datetime(today.year, today.month, 4, 23, 59, 59)  # Objet datetime pour comparaison
 
     # 4. Filtrer les lignes avec des dates 'Created at' <= date_limite
     if 'Created at' in df.columns:
+        # Convertir la colonne en datetime, forcer à NaT si non convertible
         df['Created at'] = pd.to_datetime(df['Created at'], errors='coerce')
+
+        # Supprimer les lignes avec des dates invalides ou NaT
+        df = df[df['Created at'].notna()]
+
+        # Appliquer le filtre de date
         df = df[df['Created at'] <= date_limite]
+
         # Supprimer la colonne 'Created at' après le filtrage
         df = df.drop(columns=['Created at'], errors='ignore')
     else:
@@ -101,7 +108,7 @@ if uploaded_file and file_name:
                 label="Télécharger le fichier France",
                 data=file,
                 file_name=france_file_name,
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
         # Sauvegarder le fichier pour le reste du monde
@@ -111,5 +118,5 @@ if uploaded_file and file_name:
                 label="Télécharger le fichier Étranger",
                 data=file,
                 file_name=rest_of_world_file_name,
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
