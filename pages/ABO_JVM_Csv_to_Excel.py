@@ -16,15 +16,11 @@ def process_csv(csv_file):
 
     # 4. Convertir la colonne "Next order date" en datetime
     if 'Next order date' in df.columns:
-        # Tenter de convertir en datetime
-        df['Next order date'] = pd.to_datetime(df['Next order date'], errors='coerce')
+        df['Next order date'] = pd.to_datetime(df['Next order date'], errors='coerce')  # Convertir en datetime
 
-        # Filtrer en excluant les lignes annulées avec une Next Order Date trop ancienne
-        df = df[~(
-            (df['Status'] == 'CANCELLED') & 
-            (df['Next order date'].notnull()) & 
-            (df['Next order date'] < pd.Timestamp(start_date))
-        )]
+        # Filtrer les lignes annulées avec une Next Order Date trop ancienne
+        cancelled_filter = (df['Status'] == 'CANCELLED') & (df['Next order date'].notnull())
+        df = df[~(cancelled_filter & (df['Next order date'] < start_date))]
     else:
         st.error("Le fichier CSV ne contient pas de colonne 'Next order date'.")
 
