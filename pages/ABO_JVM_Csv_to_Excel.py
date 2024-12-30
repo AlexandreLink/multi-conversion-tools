@@ -13,11 +13,11 @@ def process_csv(csv_file):
     today = datetime.today()
     start_date = today.replace(day=5)
 
-    # 4. Vérifier et convertir 'Next order date' en datetime
+    # 4. Convertir 'Next order date' en datetime
     if 'Next order date' in df.columns:
         df['Next order date'] = pd.to_datetime(df['Next order date'], errors='coerce')
-        if df['Next order date'].isnull().any():
-            print("Attention : Certaines valeurs dans 'Next order date' n'ont pas pu être converties.")
+        df['Next order date'] = df['Next order date'].dt.tz_localize(None)  # Normaliser les fuseaux horaires
+        print("Next order date après conversion :", df['Next order date'].head())
     else:
         raise ValueError("La colonne 'Next order date' est absente dans le fichier.")
 
@@ -25,7 +25,7 @@ def process_csv(csv_file):
     if 'Status' not in df.columns:
         raise ValueError("La colonne 'Status' est absente dans le fichier.")
 
-    # 6. Appliquer le filtre pour exclure les abonnements annulés avant la date limite
+    # 6. Filtrer les abonnements annulés avec une next order date avant la date limite
     cancelled_filter = (df['Status'] == 'CANCELLED') & df['Next order date'].notnull()
     df = df[~(cancelled_filter & (df['Next order date'] < start_date))]
 
