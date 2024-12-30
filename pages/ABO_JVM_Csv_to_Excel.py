@@ -18,13 +18,16 @@ def process_csv(csv_file):
     if 'Next order date' in df.columns:
         df['Next order date'] = pd.to_datetime(df['Next order date'], errors='coerce')
 
+        # Rendre les dates "offset-naive" pour harmoniser avec start_date
+        df['Next order date'] = df['Next order date'].dt.tz_localize(None)
+
         # Filtrer en excluant les lignes annulées avec une Next Order Date trop ancienne
         df = df[~((df['Status'] == 'CANCELLED') & (df['Next order date'].notnull()) & (df['Next order date'] < start_date))]
     else:
         st.error("Le fichier CSV ne contient pas de colonne 'Next order date'.")
 
     # 5. Filtrer les lignes avec des dates 'Created at' <= date limite
-    date_limite = f"{today.year}-{today.month:02d}-04T23:59:59+01:00"
+    date_limite = f"{today.year}-{today.month:02d}-04T23:59:59"
     if 'Created at' in df.columns:
         df['Created at'] = pd.to_datetime(df['Created at'], errors='coerce')
         df = df[df['Created at'] <= pd.to_datetime(date_limite, errors='coerce')]
@@ -102,7 +105,7 @@ if uploaded_file and file_name:
                 label="Télécharger le fichier France",
                 data=file,
                 file_name=france_file_name,
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             )
 
         # Sauvegarder le fichier pour le reste du monde
@@ -112,5 +115,5 @@ if uploaded_file and file_name:
                 label="Télécharger le fichier Étranger",
                 data=file,
                 file_name=rest_of_world_file_name,
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             )
