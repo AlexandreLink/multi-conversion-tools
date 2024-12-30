@@ -15,22 +15,20 @@ def process_csv(csv_file):
 
     # 4. Convertir 'Next order date' au format datetime
     if 'Next order date' in df.columns:
-        # Conversion sécurisée avec gestion des erreurs
+        # Convertir la colonne en datetime, remplacer les erreurs par NaT
         df['Next order date'] = pd.to_datetime(df['Next order date'], errors='coerce')
-        # Supprimer les informations de fuseaux horaires (si applicable)
-        if pd.api.types.is_datetime64_any_dtype(df['Next order date']):
-            df['Next order date'] = df['Next order date'].dt.tz_localize(None)
     else:
         raise ValueError("La colonne 'Next order date' est absente dans le fichier.")
 
-    # 5. Filtrer les abonnements annulés avec une date avant le 5 du mois
-    if 'Status' in df.columns:
-        cancelled_filter = (df['Status'] == 'CANCELLED') & df['Next order date'].notnull()
-        df = df[~(cancelled_filter & (df['Next order date'] < start_date))]
-    else:
+    # 5. Vérifier que la colonne 'Status' existe
+    if 'Status' not in df.columns:
         raise ValueError("La colonne 'Status' est absente dans le fichier.")
 
-    # 6. Garder uniquement les colonnes spécifiées
+    # 6. Appliquer le filtre pour exclure les abonnements annulés avant la date limite
+    cancelled_filter = (df['Status'] == 'CANCELLED') & df['Next order date'].notnull()
+    df = df[~(cancelled_filter & (df['Next order date'] < start_date))]
+
+    # 7. Garder uniquement les colonnes spécifiées
     columns_to_keep = [
         "ID", "Customer name", "Delivery address 1", "Delivery address 2", 
         "Delivery zip", "Delivery city", "Delivery province code", 
@@ -38,14 +36,14 @@ def process_csv(csv_file):
     ]
     df = df[columns_to_keep]
 
-    # 7. Corriger la colonne 'Billing country' directement si vide ou manquante
+    # 8. Corriger la colonne 'Billing country' directement si vide ou manquante
     df['Billing country'] = df.apply(
         lambda row: "FRANCE" if (pd.isnull(row['Billing country']) or row['Billing country'].strip() == "") 
         and row['Delivery country code'] == "FR" else row['Billing country'],
         axis=1
     )
 
-    # 8. Renommer les colonnes pour correspondre aux noms finaux et ordonner
+    # 9. Renommer les colonnes pour correspondre aux noms finaux et ordonner
     column_mapping = {
         "ID": "Customer ID",
         "Customer name": "Delivery name",
@@ -60,7 +58,7 @@ def process_csv(csv_file):
     }
     df = df.rename(columns=column_mapping)
 
-    # Réorganiser les colonnes pour correspondre à l'ordre final souhaité
+    # 10. Réorganiser les colonnes pour correspondre à l'ordre final souhaité
     final_columns = [
         "Customer ID", "Delivery name", "Delivery address 1", "Delivery address 2", 
         "Delivery zip", "Delivery city", "Delivery province code", 
