@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 
 def process_csv(csv_file):
     # 1. Lire le fichier CSV avec toutes les colonnes
@@ -12,14 +12,17 @@ def process_csv(csv_file):
     # 3. Déterminer la plage de dates pour la validation
     today = datetime.today()
     start_date = today.replace(day=5)  # 5 du mois en cours
-    end_date = (start_date + pd.DateOffset(months=1)).replace(day=4)  # 4 du mois suivant
+    end_date = (start_date + timedelta(days=31)).replace(day=4)  # 4 du mois suivant
 
     # 4. Convertir la colonne "Next order date" en datetime
     if 'Next order date' in df.columns:
+        # Tenter de convertir en datetime
         df['Next order date'] = pd.to_datetime(df['Next order date'], errors='coerce')
 
-        # Rendre les dates "offset-naive" pour harmoniser avec start_date
-        df['Next order date'] = df['Next order date'].dt.tz_localize(None)
+        # Vérifier que la conversion a fonctionné
+        if pd.api.types.is_datetime64_any_dtype(df['Next order date']):
+            # Rendre les dates "offset-naive" pour harmoniser avec start_date
+            df['Next order date'] = df['Next order date'].dt.tz_localize(None)
 
         # Filtrer en excluant les lignes annulées avec une Next Order Date trop ancienne
         df = df[~((df['Status'] == 'CANCELLED') & (df['Next order date'].notnull()) & (df['Next order date'] < start_date))]
