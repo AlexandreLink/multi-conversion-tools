@@ -14,12 +14,12 @@ def process_csv(csv_file):
     start_date = today.replace(day=5)  # 5 du mois en cours
     end_date = (start_date + pd.DateOffset(months=1)).replace(day=4)  # 4 du mois suivant
 
-    # 4. Convertir la colonne "Next Order Date" en datetime
+    # 4. Convertir la colonne "Next order date" en datetime
     if 'Next order date' in df.columns:
         df['Next order date'] = pd.to_datetime(df['Next order date'], errors='coerce')
 
-        # Appliquer la logique pour exclure les lignes annulées avec une Next Order Date trop ancienne
-        df = df[~((df['Status'] == 'CANCELLED') & (df['Next order date'] < start_date))]
+        # Filtrer en excluant les lignes annulées avec une Next Order Date trop ancienne
+        df = df[~((df['Status'] == 'CANCELLED') & (df['Next order date'].notnull()) & (df['Next order date'] < start_date))]
     else:
         st.error("Le fichier CSV ne contient pas de colonne 'Next order date'.")
 
@@ -27,7 +27,7 @@ def process_csv(csv_file):
     date_limite = f"{today.year}-{today.month:02d}-04T23:59:59+01:00"
     if 'Created at' in df.columns:
         df['Created at'] = pd.to_datetime(df['Created at'], errors='coerce')
-        df = df[df['Created at'] <= date_limite]
+        df = df[df['Created at'] <= pd.to_datetime(date_limite, errors='coerce')]
         # Supprimer la colonne 'Created at' après le filtrage
         df = df.drop(columns=['Created at'], errors='ignore')
     else:
