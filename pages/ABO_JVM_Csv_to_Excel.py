@@ -9,32 +9,44 @@ def process_csv(csv_file):
     # 2. Mettre toutes les valeurs en majuscules
     df = df.applymap(lambda x: x.upper() if isinstance(x, str) else x)
 
-    # 3. Créer la date limite au format du CSV (ex. "2024-11-04T23:59:59+01:00")
+    # 3. Déterminer la plage de dates pour la validation
     today = datetime.today()
-    date_limite_str = f"{today.year}-{today.month:02d}-04T23:59:59+01:00"
+    start_date = today.replace(day=5)  # 5 du mois en cours
+    end_date = (start_date + pd.DateOffset(months=1)).replace(day=4)  # 4 du mois suivant
 
-    # 4. Filtrer les lignes avec des dates 'Created at' <= date_limite_str
+    # 4. Convertir la colonne "Next Order Date" en datetime
+    if 'Next order date' in df.columns:
+        df['Next order date'] = pd.to_datetime(df['Next order date'], errors='coerce')
+
+        # Appliquer la logique pour exclure les lignes annulées avec une Next Order Date trop ancienne
+        df = df[~((df['Status'] == 'CANCELLED') & (df['Next order date'] < start_date))]
+    else:
+        st.error("Le fichier CSV ne contient pas de colonne 'Next order date'.")
+
+    # 5. Filtrer les lignes avec des dates 'Created at' <= date limite
+    date_limite = f"{today.year}-{today.month:02d}-04T23:59:59+01:00"
     if 'Created at' in df.columns:
-        df = df[df['Created at'] <= date_limite_str]
+        df['Created at'] = pd.to_datetime(df['Created at'], errors='coerce')
+        df = df[df['Created at'] <= date_limite]
         # Supprimer la colonne 'Created at' après le filtrage
         df = df.drop(columns=['Created at'], errors='ignore')
     else:
-        st.error("Le fichier CSV ne contient pas de colonne 'Created at' pour les dates de commande.")
+        st.error("Le fichier CSV ne contient pas de colonne 'Created at'.")
 
-    # 5. Garder uniquement les colonnes spécifiées
+    # 6. Garder uniquement les colonnes spécifiées
     columns_to_keep = ["ID", "Customer name", "Delivery address 1", "Delivery address 2", 
                        "Delivery zip", "Delivery city", "Delivery province code", 
                        "Delivery country code", "Billing country", "Delivery interval count"]
     df = df[columns_to_keep]
 
-    # 6. Corriger la colonne 'Billing country' directement si vide ou manquante
+    # 7. Corriger la colonne 'Billing country' directement si vide ou manquante
     df['Billing country'] = df.apply(
         lambda row: "FRANCE" if (pd.isnull(row['Billing country']) or row['Billing country'].strip() == "") 
         and row['Delivery country code'] == "FR" else row['Billing country'],
         axis=1
     )
 
-    # 7. Renommer les colonnes pour correspondre aux noms finaux et ordonner
+    # 8. Renommer les colonnes pour correspondre aux noms finaux et ordonner
     column_mapping = {
         "ID": "Customer ID",
         "Customer name": "Delivery name",
@@ -81,7 +93,7 @@ if uploaded_file and file_name:
 
         # Enregistrer les fichiers avec les noms personnalisés
         france_file_name = f"{file_name}_FRANCE.xlsx"
-        rest_of_world_file_name = f"{file_name}_Rest_of_World.xlsx"
+        rest_of_world_file_name = f"{file_name}_ETRANGER.xlsx"
 
         # Sauvegarder le fichier pour la France
         df_france.to_excel(france_file_name, index=False)
@@ -97,7 +109,7 @@ if uploaded_file and file_name:
         df_rest_of_world.to_excel(rest_of_world_file_name, index=False)
         with open(rest_of_world_file_name, "rb") as file:
             st.download_button(
-                label="Télécharger le fichier Reste du Monde",
+                label="Télécharger le fichier Étranger",
                 data=file,
                 file_name=rest_of_world_file_name,
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
