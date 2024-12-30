@@ -3,20 +3,21 @@ import pandas as pd
 from datetime import datetime
 
 def process_csv(csv_file):
-    # 1. Lire le fichier CSV avec toutes les colonnes
+    # 1. Lire le fichier CSV
     df = pd.read_csv(csv_file)
 
-    # 2. Mettre toutes les valeurs en majuscules
+    # 2. Mettre toutes les valeurs en majuscules (pour les colonnes texte uniquement)
     df = df.applymap(lambda x: x.upper() if isinstance(x, str) else x)
 
     # 3. Définir la date limite (5 du mois en cours)
     today = datetime.today()
     start_date = today.replace(day=5)
 
-    # 4. Convertir 'Next order date' au format datetime
+    # 4. Vérifier et convertir 'Next order date' en datetime
     if 'Next order date' in df.columns:
-        # Convertir la colonne en datetime, remplacer les erreurs par NaT
         df['Next order date'] = pd.to_datetime(df['Next order date'], errors='coerce')
+        if df['Next order date'].isnull().any():
+            print("Attention : Certaines valeurs dans 'Next order date' n'ont pas pu être converties.")
     else:
         raise ValueError("La colonne 'Next order date' est absente dans le fichier.")
 
@@ -36,7 +37,7 @@ def process_csv(csv_file):
     ]
     df = df[columns_to_keep]
 
-    # 8. Corriger la colonne 'Billing country' directement si vide ou manquante
+    # 8. Corriger la colonne 'Billing country' si vide ou manquante
     df['Billing country'] = df.apply(
         lambda row: "FRANCE" if (pd.isnull(row['Billing country']) or row['Billing country'].strip() == "") 
         and row['Delivery country code'] == "FR" else row['Billing country'],
