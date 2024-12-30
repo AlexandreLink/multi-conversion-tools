@@ -6,28 +6,42 @@ def process_csv(csv_file):
     # 1. Lire le fichier CSV
     df = pd.read_csv(csv_file)
 
-    # 2. Mettre toutes les valeurs en majuscules (pour les colonnes texte uniquement)
+    # 2. Conversion de toutes les colonnes en majuscules (optionnel selon besoin)
     df = df.applymap(lambda x: x.upper() if isinstance(x, str) else x)
 
-    # 3. Définir la date limite (5 du mois en cours)
-    today = datetime.today()
-    start_date = today.replace(day=5)
-
-    # 4. Convertir 'Next order date' en datetime
+    # 3. Gestion de la colonne "Next order date" - Conversion en datetime
     if 'Next order date' in df.columns:
+        # Conversion en datetime avec gestion des erreurs
         df['Next order date'] = pd.to_datetime(df['Next order date'], errors='coerce')
-        df['Next order date'] = df['Next order date'].dt.tz_localize(None)  # Normaliser les fuseaux horaires
-        print("Next order date après conversion :", df['Next order date'].head())
+
+        # Supprimer les fuseaux horaires si présents
+        if pd.api.types.is_datetime64_any_dtype(df['Next order date']):
+            df['Next order date'] = df['Next order date'].dt.tz_localize(None)
     else:
         raise ValueError("La colonne 'Next order date' est absente dans le fichier.")
 
-    # 5. Vérifier que la colonne 'Status' existe
-    if 'Status' not in df.columns:
-        raise ValueError("La colonne 'Status' est absente dans le fichier.")
+    # 4. Gestion de la colonne "Created at" - Filtrer selon la date limite
+    if 'Created at' in df.columns:
+        df['Created at'] = pd.to_datetime(df['Created at'], errors='coerce')
+        today = datetime.today()
+        date_limite = today.replace(day=4, hour=23, minute=59, second=59)
+        df = df[df['Created at'] <= date_limite]
+    else:
+        raise ValueError("La colonne 'Created at' est absente dans le fichier.")
 
-    # 6. Filtrer les abonnements annulés avec une next order date avant la date limite
+    # 5. Gestion des abonnements annulés avec "Next order date"
+    today = datetime.today()
+    start_date = today.replace(day=5, hour=0, minute=0, second=0, microsecond=0)
     cancelled_filter = (df['Status'] == 'CANCELLED') & df['Next order date'].notnull()
     df = df[~(cancelled_filter & (df['Next order date'] < start_date))]
+
+    # 6. Gestion des colonnes "Billing country" pour les champs vides
+    if 'Billing country' in df.columns and 'Delivery country code' in df.columns:
+        df['Billing country'] = df.apply(
+            lambda row: "FRANCE" if (pd.isnull(row['Billing country']) or row['Billing country'].strip() == "") 
+            and row['Delivery country code'] == "FR" else row['Billing country'],
+            axis=1
+        )
 
     # 7. Garder uniquement les colonnes spécifiées
     columns_to_keep = [
@@ -37,14 +51,7 @@ def process_csv(csv_file):
     ]
     df = df[columns_to_keep]
 
-    # 8. Corriger la colonne 'Billing country' si vide ou manquante
-    df['Billing country'] = df.apply(
-        lambda row: "FRANCE" if (pd.isnull(row['Billing country']) or row['Billing country'].strip() == "") 
-        and row['Delivery country code'] == "FR" else row['Billing country'],
-        axis=1
-    )
-
-    # 9. Renommer les colonnes pour correspondre aux noms finaux et ordonner
+    # 8. Renommer les colonnes pour correspondre aux noms finaux et ordonner
     column_mapping = {
         "ID": "Customer ID",
         "Customer name": "Delivery name",
@@ -59,7 +66,7 @@ def process_csv(csv_file):
     }
     df = df.rename(columns=column_mapping)
 
-    # 10. Réorganiser les colonnes pour correspondre à l'ordre final souhaité
+    # Réorganiser les colonnes pour correspondre à l'ordre final souhaité
     final_columns = [
         "Customer ID", "Delivery name", "Delivery address 1", "Delivery address 2", 
         "Delivery zip", "Delivery city", "Delivery province code", 
@@ -68,6 +75,7 @@ def process_csv(csv_file):
     df = df[final_columns]
 
     return df
+
 
 # Interface Streamlit
 st.title("Convertisseur CSV vers Excel et Traitement des Données")
