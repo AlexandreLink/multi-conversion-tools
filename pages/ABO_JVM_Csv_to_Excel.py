@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime
 
 def process_csv(csv_file):
     # 1. Lire le fichier CSV avec toutes les colonnes
@@ -9,35 +9,31 @@ def process_csv(csv_file):
     # 2. Mettre toutes les valeurs en majuscules
     df = df.applymap(lambda x: x.upper() if isinstance(x, str) else x)
 
-    # 3. Déterminer la plage de dates pour la validation
+    # 3. Définir la date limite (5 du mois en cours)
     today = datetime.today()
-    start_date = today.replace(day=5)  # 5 du mois en cours
-    end_date = (start_date + timedelta(days=31)).replace(day=4)  # 4 du mois suivant
+    start_date = today.replace(day=5)
 
-    # 4. Convertir la colonne "Next order date" en datetime
+    # 4. Convertir 'Next order date' au format datetime
     if 'Next order date' in df.columns:
-        df['Next order date'] = pd.to_datetime(df['Next order date'], errors='coerce')  # Convertir en datetime
+        df['Next order date'] = pd.to_datetime(df['Next order date'], errors='coerce')
+        # Supprimer les informations de fuseaux horaires pour comparer avec `start_date`
+        df['Next order date'] = df['Next order date'].dt.tz_localize(None)
+    else:
+        raise ValueError("La colonne 'Next order date' est absente dans le fichier.")
 
-        # Filtrer les lignes annulées avec une Next Order Date trop ancienne
-        cancelled_filter = (df['Status'] == 'CANCELLED') & (df['Next order date'].notnull())
+    # 5. Filtrer les abonnements annulés avec une date avant le 5 du mois
+    if 'Status' in df.columns:
+        cancelled_filter = (df['Status'] == 'CANCELLED') & df['Next order date'].notnull()
         df = df[~(cancelled_filter & (df['Next order date'] < start_date))]
     else:
-        st.error("Le fichier CSV ne contient pas de colonne 'Next order date'.")
-
-    # 5. Filtrer les lignes avec des dates 'Created at' <= date limite
-    date_limite = f"{today.year}-{today.month:02d}-04T23:59:59"
-    if 'Created at' in df.columns:
-        df['Created at'] = pd.to_datetime(df['Created at'], errors='coerce')
-        df = df[df['Created at'] <= pd.to_datetime(date_limite, errors='coerce')]
-        # Supprimer la colonne 'Created at' après le filtrage
-        df = df.drop(columns=['Created at'], errors='ignore')
-    else:
-        st.error("Le fichier CSV ne contient pas de colonne 'Created at'.")
+        raise ValueError("La colonne 'Status' est absente dans le fichier.")
 
     # 6. Garder uniquement les colonnes spécifiées
-    columns_to_keep = ["ID", "Customer name", "Delivery address 1", "Delivery address 2", 
-                       "Delivery zip", "Delivery city", "Delivery province code", 
-                       "Delivery country code", "Billing country", "Delivery interval count"]
+    columns_to_keep = [
+        "ID", "Customer name", "Delivery address 1", "Delivery address 2", 
+        "Delivery zip", "Delivery city", "Delivery province code", 
+        "Delivery country code", "Billing country", "Delivery interval count"
+    ]
     df = df[columns_to_keep]
 
     # 7. Corriger la colonne 'Billing country' directement si vide ou manquante
@@ -63,9 +59,11 @@ def process_csv(csv_file):
     df = df.rename(columns=column_mapping)
 
     # Réorganiser les colonnes pour correspondre à l'ordre final souhaité
-    final_columns = ["Customer ID", "Delivery name", "Delivery address 1", "Delivery address 2", 
-                     "Delivery zip", "Delivery city", "Delivery province code", 
-                     "Delivery country code", "Billing country", "Quantity"]
+    final_columns = [
+        "Customer ID", "Delivery name", "Delivery address 1", "Delivery address 2", 
+        "Delivery zip", "Delivery city", "Delivery province code", 
+        "Delivery country code", "Billing country", "Quantity"
+    ]
     df = df[final_columns]
 
     return df
