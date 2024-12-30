@@ -15,9 +15,11 @@ def process_csv(csv_file):
 
     # 4. Convertir 'Next order date' au format datetime
     if 'Next order date' in df.columns:
+        # Conversion sécurisée avec gestion des erreurs
         df['Next order date'] = pd.to_datetime(df['Next order date'], errors='coerce')
-        # Supprimer les informations de fuseaux horaires pour comparer avec `start_date`
-        df['Next order date'] = df['Next order date'].dt.tz_localize(None)
+        # Supprimer les informations de fuseaux horaires (si applicable)
+        if pd.api.types.is_datetime64_any_dtype(df['Next order date']):
+            df['Next order date'] = df['Next order date'].dt.tz_localize(None)
     else:
         raise ValueError("La colonne 'Next order date' est absente dans le fichier.")
 
