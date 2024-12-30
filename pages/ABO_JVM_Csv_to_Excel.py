@@ -19,10 +19,10 @@ def process_csv(csv_file):
         # Tenter de convertir en datetime
         df['Next order date'] = pd.to_datetime(df['Next order date'], errors='coerce')
 
-        # Vérifier que la conversion a fonctionné
-        if pd.api.types.is_datetime64_any_dtype(df['Next order date']):
-            # Rendre les dates "offset-naive" pour harmoniser avec start_date
-            df['Next order date'] = df['Next order date'].dt.tz_localize(None)
+        # Afficher un aperçu des valeurs non valides
+        invalid_dates = df[df['Next order date'].isnull() & df['Next order date'].notna()]
+        if not invalid_dates.empty:
+            st.warning("Certaines valeurs de 'Next order date' n'ont pas pu être converties en datetime.")
 
         # Filtrer en excluant les lignes annulées avec une Next Order Date trop ancienne
         df = df[~((df['Status'] == 'CANCELLED') & (df['Next order date'].notnull()) & (df['Next order date'] < start_date))]
@@ -108,7 +108,7 @@ if uploaded_file and file_name:
                 label="Télécharger le fichier France",
                 data=file,
                 file_name=france_file_name,
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
         # Sauvegarder le fichier pour le reste du monde
@@ -118,5 +118,5 @@ if uploaded_file and file_name:
                 label="Télécharger le fichier Étranger",
                 data=file,
                 file_name=rest_of_world_file_name,
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
