@@ -6,36 +6,40 @@ def process_csv(csv_file):
     # 1. Lire le fichier CSV
     df = pd.read_csv(csv_file)
 
-    # 2. Conversion de toutes les colonnes en majuscules (optionnel selon besoin)
+    # 2. Conversion de toutes les colonnes en majuscules
     df = df.applymap(lambda x: x.upper() if isinstance(x, str) else x)
 
-    # 3. Gestion de la colonne "Next order date" - Conversion en datetime
-    if 'Next order date' in df.columns:
-        # Conversion en datetime avec gestion des erreurs
-        df['Next order date'] = pd.to_datetime(df['Next order date'], errors='coerce')
+    # 3. Gestion de la colonne "Created at"
+    if 'Created at' in df.columns:
+        # Convertir en datetime en gérant les erreurs
+        df['Created at'] = pd.to_datetime(df['Created at'], errors='coerce')
 
-        # Supprimer les fuseaux horaires si présents
+        # Supprimer les lignes où la conversion a échoué
+        df = df[df['Created at'].notnull()]
+
+        # Définir la limite de date pour la comparaison
+        today = datetime.today()
+        date_limite = today.replace(day=4, hour=23, minute=59, second=59)
+
+        # Filtrer les lignes selon la date limite
+        df = df[df['Created at'] <= date_limite]
+    else:
+        raise ValueError("La colonne 'Created at' est absente dans le fichier.")
+
+    # 4. Gestion de la colonne "Next order date"
+    if 'Next order date' in df.columns:
+        df['Next order date'] = pd.to_datetime(df['Next order date'], errors='coerce')
         if pd.api.types.is_datetime64_any_dtype(df['Next order date']):
             df['Next order date'] = df['Next order date'].dt.tz_localize(None)
     else:
         raise ValueError("La colonne 'Next order date' est absente dans le fichier.")
 
-    # 4. Gestion de la colonne "Created at" - Filtrer selon la date limite
-    if 'Created at' in df.columns:
-        df['Created at'] = pd.to_datetime(df['Created at'], errors='coerce')
-        today = datetime.today()
-        date_limite = today.replace(day=4, hour=23, minute=59, second=59)
-        df = df[df['Created at'] <= date_limite]
-    else:
-        raise ValueError("La colonne 'Created at' est absente dans le fichier.")
-
-    # 5. Gestion des abonnements annulés avec "Next order date"
-    today = datetime.today()
+    # 5. Gestion des abonnements annulés
     start_date = today.replace(day=5, hour=0, minute=0, second=0, microsecond=0)
     cancelled_filter = (df['Status'] == 'CANCELLED') & df['Next order date'].notnull()
     df = df[~(cancelled_filter & (df['Next order date'] < start_date))]
 
-    # 6. Gestion des colonnes "Billing country" pour les champs vides
+    # 6. Gestion des champs vides dans "Billing country"
     if 'Billing country' in df.columns and 'Delivery country code' in df.columns:
         df['Billing country'] = df.apply(
             lambda row: "FRANCE" if (pd.isnull(row['Billing country']) or row['Billing country'].strip() == "") 
@@ -51,7 +55,7 @@ def process_csv(csv_file):
     ]
     df = df[columns_to_keep]
 
-    # 8. Renommer les colonnes pour correspondre aux noms finaux et ordonner
+    # 8. Renommer les colonnes pour correspondre aux noms finaux
     column_mapping = {
         "ID": "Customer ID",
         "Customer name": "Delivery name",
@@ -75,7 +79,6 @@ def process_csv(csv_file):
     df = df[final_columns]
 
     return df
-
 
 # Interface Streamlit
 st.title("Convertisseur CSV vers Excel et Traitement des Données")
