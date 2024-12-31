@@ -6,7 +6,11 @@ def process_csv(csv_file):
     # Charger le fichier CSV
     df = pd.read_csv(csv_file)
 
-    # Étape 1 : Conversion en datetime
+    # Étape 1 : Nettoyer les données avant conversion
+    df['Next order date'] = df['Next order date'].str.strip()  # Supprimer les espaces superflus
+    df['Next order date'] = df['Next order date'].replace('', pd.NA)  # Remplacer les chaînes vides par NaN
+
+    # Étape 2 : Conversion en datetime
     try:
         df['Next order date'] = pd.to_datetime(df['Next order date'], errors='coerce')
         st.write("Types de données après conversion :", df['Next order date'].dtype)
@@ -14,7 +18,7 @@ def process_csv(csv_file):
         st.error(f"Erreur lors de la conversion en datetime : {e}")
         return None
 
-    # Étape 2 : Identifier et afficher les valeurs invalides
+    # Étape 3 : Identifier et afficher les valeurs invalides
     invalid_dates = df[df['Next order date'].isna()]
     if not invalid_dates.empty:
         st.write("Valeurs non valides dans 'Next order date' :")
@@ -23,18 +27,18 @@ def process_csv(csv_file):
     else:
         st.write("Toutes les valeurs de 'Next order date' sont valides.")
 
-    # Étape 3 : Supprimer les fuseaux horaires si présents
+    # Étape 4 : Supprimer les fuseaux horaires si présents
     try:
         df['Next order date'] = df['Next order date'].dt.tz_localize(None)
     except Exception as e:
         st.error(f"Erreur lors de la suppression des fuseaux horaires : {e}")
         return None
 
-    # Étape 4 : Créer la date limite pour filtrage
+    # Étape 5 : Créer la date limite pour filtrage
     start_date = datetime.now().replace(day=5, hour=0, minute=0, second=0, microsecond=0)
     st.write("Date limite pour filtrage (start_date) :", start_date)
 
-    # Étape 5 : Filtrer les abonnements annulés avec une `Next order date` antérieure
+    # Étape 6 : Filtrer les abonnements annulés avec une `Next order date` antérieure
     try:
         cancelled_filter = df['Status'] == 'CANCELLED'
         df = df[~(cancelled_filter & (df['Next order date'] < start_date))]
@@ -45,6 +49,7 @@ def process_csv(csv_file):
 
     # Retourner le DataFrame filtré
     return df
+
 
 
 # Interface Streamlit
