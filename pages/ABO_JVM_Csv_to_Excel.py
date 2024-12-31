@@ -6,13 +6,24 @@ def process_csv(csv_file):
     # Charger le fichier CSV
     df = pd.read_csv(csv_file)
 
-    # Normaliser les fuseaux horaires pour 'Next order date'
-    df['Next order date'] = pd.to_datetime(df['Next order date'], errors='coerce').dt.tz_localize(None)
+    # Conversion initiale de 'Next order date' en datetime, avec gestion des erreurs
+    df['Next order date'] = pd.to_datetime(df['Next order date'], errors='coerce')
+
+    # Identifier les valeurs non interprétées comme dates (valeurs NaT)
+    invalid_dates = df[df['Next order date'].isna()]
+    if not invalid_dates.empty:
+        st.write("Valeurs non valides dans 'Next order date' :")
+        st.dataframe(invalid_dates)
+    else:
+        st.write("Toutes les valeurs de 'Next order date' sont valides.")
+
+    # Supprimer les fuseaux horaires pour 'Next order date' uniquement si les valeurs sont valides
+    df['Next order date'] = df['Next order date'].dt.tz_localize(None)
 
     # Créer la date limite de filtrage au format tz-naive
     start_date = datetime.now().replace(tzinfo=None)
 
-    # Afficher les informations de debug pour vérifier les valeurs
+    # Afficher les informations pour vérification
     st.write("Valeurs dans 'Next order date' après conversion :")
     st.dataframe(df['Next order date'].head(10))
     st.write("Start date pour comparaison :", start_date)
@@ -20,7 +31,7 @@ def process_csv(csv_file):
     # Appliquer les filtres pour retirer les entrées annulées avec des dates trop anciennes
     cancelled_filter = df['Status'] == 'CANCELLED'
 
-    # Comparaison des valeurs en s'assurant que les formats sont compatibles
+    # Comparaison des valeurs
     try:
         df = df[~(cancelled_filter & (df['Next order date'] < start_date))]
         st.write("Filtrage effectué avec succès.")
@@ -29,6 +40,7 @@ def process_csv(csv_file):
 
     # Retourner le dataframe filtré
     return df
+
 
 # Interface Streamlit
 st.title("Debugging : Problèmes de type avec les dates")
