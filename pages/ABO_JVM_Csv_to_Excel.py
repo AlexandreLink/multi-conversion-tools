@@ -2,9 +2,6 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-from datetime import datetime
-import pandas as pd
-
 def process_csv(csv_file):
     # Lire le fichier CSV
     df = pd.read_csv(csv_file)
