@@ -6,76 +6,39 @@ def process_csv(csv_file):
     # Lire le fichier CSV
     df = pd.read_csv(csv_file)
 
-    # Vérification : les colonnes nécessaires sont-elles présentes ?
-    required_columns = ['Created at', 'Next order date', 'Status', 'Billing country', 'Delivery country code']
-    for col in required_columns:
-        if col not in df.columns:
-            raise ValueError(f"La colonne obligatoire '{col}' est absente.")
-
-    # Conversion sécurisée des colonnes date
-    for date_col in ['Created at', 'Next order date']:
-        df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
-        if df[date_col].isnull().all():
-            raise ValueError(f"Toutes les valeurs dans '{date_col}' sont invalides après conversion.")
-
-    # Supprimer les lignes avec 'Created at' ou 'Next order date' invalides
-    initial_rows = len(df)
-    df = df[df['Created at'].notnull() & df['Next order date'].notnull()]
-    remaining_rows = len(df)
-    print(f"Lignes initiales : {initial_rows}, après suppression des NaT : {remaining_rows}")
-
     # Définir les limites de date pour la comparaison
     today = datetime.today()
     date_limite = today.replace(day=4, hour=23, minute=59, second=59, microsecond=0)
     start_date = today.replace(day=5, hour=0, minute=0, second=0, microsecond=0)
 
-    # Filtrer selon 'Created at'
-    df = df[df['Created at'] <= date_limite]
+    # Debugging : Affichez les dates limites
+    print("Date limite :", date_limite, "Type :", type(date_limite))
+    print("Start date :", start_date, "Type :", type(start_date))
 
-    # Gestion des abonnements annulés
-    cancelled_filter = (df['Status'] == 'CANCELLED') & (df['Next order date'].notnull())
+    # Conversion sécurisée de 'Next order date'
+    df['Next order date'] = pd.to_datetime(df['Next order date'], errors='coerce')
+    
+    # Debugging : Afficher les valeurs de 'Next order date' et leurs types
+    print("Valeurs de 'Next order date' après conversion :")
+    print(df['Next order date'].head())
+    print("Type de données :", df['Next order date'].dtype)
+
+    # Debugging : Vérifier les valeurs problématiques
+    invalid_dates = df[df['Next order date'].isnull()]
+    print("Lignes avec 'Next order date' non valide :", invalid_dates)
+
+    # Filtrer les abonnements annulés
+    cancelled_filter = (df['Status'] == 'CANCELLED')
+    filtered_rows = df[cancelled_filter & (df['Next order date'] < start_date)]
+
+    # Debugging : Afficher les lignes qui correspondent au filtre problématique
+    print("Lignes annulées avec 'Next order date' avant start_date :")
+    print(filtered_rows)
+
+    # Appliquer le filtre
     df = df[~(cancelled_filter & (df['Next order date'] < start_date))]
 
-    # Gestion des champs vides dans "Billing country"
-    df['Billing country'] = df.apply(
-        lambda row: "FRANCE" if (pd.isnull(row['Billing country']) or row['Billing country'].strip() == "") 
-        and row['Delivery country code'] == "FR" else row['Billing country'],
-        axis=1
-    )
-
-    # Garder uniquement les colonnes spécifiées
-    columns_to_keep = [
-        "ID", "Customer name", "Delivery address 1", "Delivery address 2", 
-        "Delivery zip", "Delivery city", "Delivery province code", 
-        "Delivery country code", "Billing country", "Delivery interval count"
-    ]
-    df = df[columns_to_keep]
-
-    # Renommer les colonnes
-    column_mapping = {
-        "ID": "Customer ID",
-        "Customer name": "Delivery name",
-        "Delivery address 1": "Delivery address 1",
-        "Delivery address 2": "Delivery address 2",
-        "Delivery zip": "Delivery zip",
-        "Delivery city": "Delivery city",
-        "Delivery province code": "Delivery province code",
-        "Delivery country code": "Delivery country code",
-        "Billing country": "Billing country",
-        "Delivery interval count": "Quantity"
-    }
-    df = df.rename(columns=column_mapping)
-
-    # Réorganiser les colonnes
-    final_columns = [
-        "Customer ID", "Delivery name", "Delivery address 1", "Delivery address 2", 
-        "Delivery zip", "Delivery city", "Delivery province code", 
-        "Delivery country code", "Billing country", "Quantity"
-    ]
-    df = df[final_columns]
-
     return df
-
 
 # Interface Streamlit
 st.title("Convertisseur CSV vers Excel et Traitement des Données")
