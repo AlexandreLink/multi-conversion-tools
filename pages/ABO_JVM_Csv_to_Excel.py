@@ -3,48 +3,31 @@ import pandas as pd
 from datetime import datetime
 
 def process_csv(csv_file):
-    # Lire le fichier CSV avec toutes les colonnes
+    # Charger le fichier CSV
     df = pd.read_csv(csv_file)
 
-    # Afficher les types de données initiaux pour débogage
-    st.write("Types initiaux des colonnes :", df.dtypes)
+    # Normaliser les fuseaux horaires pour 'Next order date'
+    df['Next order date'] = pd.to_datetime(df['Next order date'], errors='coerce').dt.tz_localize(None)
 
-    # Afficher toutes les valeurs dans 'Next order date' avant conversion
-    st.write("Valeurs brutes dans 'Next order date' avant conversion :")
-    st.dataframe(df['Next order date'])
+    # Créer la date limite de filtrage au format tz-naive
+    start_date = datetime.now().replace(tzinfo=None)
 
-    # Convertir la colonne 'Next order date' en datetime
-    df['Next order date'] = pd.to_datetime(df['Next order date'], errors='coerce')
-
-    # Afficher les valeurs après conversion
+    # Afficher les informations de debug pour vérifier les valeurs
     st.write("Valeurs dans 'Next order date' après conversion :")
-    st.dataframe(df['Next order date'])
-
-    # Vérifier si des valeurs sont invalides après conversion
-    invalid_dates = df[df['Next order date'].isnull()]
-    st.write(f"Nombre total de valeurs invalides après conversion : {len(invalid_dates)}")
-    if not invalid_dates.empty:
-        st.write("Lignes avec des dates invalides après conversion :")
-        st.dataframe(invalid_dates)
-
-    # Filtrer les lignes avec des valeurs valides
-    df = df[df['Next order date'].notnull()]
-
-    # Définir start_date comme un objet datetime
-    today = datetime.today()
-    start_date = pd.Timestamp(today.replace(day=5))
-
-    # Afficher start_date pour vérification
+    st.dataframe(df['Next order date'].head(10))
     st.write("Start date pour comparaison :", start_date)
 
-    # Appliquer le filtre pour les abonnements annulés
-    cancelled_filter = (df['Status'] == 'CANCELLED')
+    # Appliquer les filtres pour retirer les entrées annulées avec des dates trop anciennes
+    cancelled_filter = df['Status'] == 'CANCELLED'
+
+    # Comparaison des valeurs en s'assurant que les formats sont compatibles
     try:
         df = df[~(cancelled_filter & (df['Next order date'] < start_date))]
+        st.write("Filtrage effectué avec succès.")
     except Exception as e:
         st.error(f"Erreur lors de la comparaison : {e}")
-        st.stop()
 
+    # Retourner le dataframe filtré
     return df
 
 # Interface Streamlit
