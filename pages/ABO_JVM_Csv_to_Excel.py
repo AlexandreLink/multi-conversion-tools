@@ -8,18 +8,26 @@ def process_csv(csv_file):
 
     # Conversion de 'Next order date' en datetime
     df['Next order date'] = pd.to_datetime(df['Next order date'], errors='coerce')
+    
+    # Vérification des valeurs non valides dans 'Next order date'
+    if df['Next order date'].isnull().any():
+        print("Certaines valeurs dans 'Next order date' n'ont pas pu être converties en datetime.")
+        print(df[df['Next order date'].isnull()])  # Debug : Afficher les lignes problématiques
 
-    # Calcul de start_date en datetime
+    # Normaliser la colonne pour retirer les fuseaux horaires (si présents)
+    df['Next order date'] = df['Next order date'].dt.tz_localize(None)
+
+    # Calcul de start_date au format datetime
     today = datetime.today()
     start_date = today.replace(day=5, hour=0, minute=0, second=0, microsecond=0)
-    start_date = pd.Timestamp(start_date)  # Assurez-vous que c'est un Timestamp Pandas
+    start_date = pd.Timestamp(start_date)  # Convertir en Pandas Timestamp
+    
+    # Debugging : Afficher les types et exemples pour validation
+    print(f"Start date: {start_date} | Type: {type(start_date)}")
+    print(df[['Next order date']].head())
 
-    # Afficher pour debug
-    print(f"Start date type: {type(start_date)} | Value: {start_date}")
-    print(f"Next order date sample: {df['Next order date'].head()}")
-
-    # Filtrage des abonnements annulés avec Next order date avant start_date
-    cancelled_filter = (df['Status'] == 'CANCELLED')
+    # Filtrer les abonnements annulés avant la date limite
+    cancelled_filter = df['Status'].str.upper() == 'CANCELLED'
     df = df[~(cancelled_filter & (df['Next order date'] < start_date))]
 
     return df
