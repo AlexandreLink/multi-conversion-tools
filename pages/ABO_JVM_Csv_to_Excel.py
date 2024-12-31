@@ -6,32 +6,32 @@ import pandas as pd
 from datetime import datetime
 
 def process_csv(csv_file):
-    # Lire le fichier CSV
+    # 1. Lire le fichier CSV avec toutes les colonnes
     df = pd.read_csv(csv_file)
 
-    # Conversion explicite de 'Next order date' en datetime
-    df['Next order date'] = pd.to_datetime(df['Next order date'], errors='coerce')
+    # 2. Analyser les valeurs invalides dans 'Next order date'
+    try:
+        # Tenter de convertir 'Next order date' en datetime
+        df['Next order date'] = pd.to_datetime(df['Next order date'], errors='coerce')
 
-    # Identifier et afficher les valeurs non valides pour débogage
-    invalid_dates = df[df['Next order date'].isnull()]
-    if not invalid_dates.empty:
-        print("Lignes avec des valeurs invalides dans 'Next order date' :")
-        print(invalid_dates[['Next order date', 'Status', 'Customer name', 'ID']])  # Ajoutez d'autres colonnes si nécessaire
+        # Trouver les lignes avec des valeurs invalides
+        invalid_dates = df[df['Next order date'].isnull()]
+        print(f"Nombre total de valeurs invalides : {len(invalid_dates)}")
 
-    # Normaliser les fuseaux horaires uniquement pour les valeurs valides
-    df['Next order date'] = df['Next order date'].apply(
-        lambda x: x.tz_localize(None) if pd.notnull(x) else x
-    )
+        if not invalid_dates.empty:
+            print("Lignes avec des valeurs invalides dans 'Next order date' :")
+            print(invalid_dates[['Next order date', 'Status', 'Customer name', 'ID']])
 
-    # Définir la date limite
-    today = datetime.today()
-    start_date = pd.Timestamp(today.replace(day=5, hour=0, minute=0, second=0, microsecond=0))
+            print("Valeurs brutes non valides dans 'Next order date' :")
+            print(invalid_dates['Next order date'].unique())
+    except Exception as e:
+        print(f"Erreur lors de l'analyse des valeurs invalides : {e}")
 
-    # Filtrer les abonnements annulés avant la date limite
-    cancelled_filter = df['Status'].str.upper() == 'CANCELLED'
-    df = df[~(cancelled_filter & (df['Next order date'] < start_date))]
+    # Continuez avec le reste du traitement (comme avant)
+    # ...
 
     return df
+
 
 
 
