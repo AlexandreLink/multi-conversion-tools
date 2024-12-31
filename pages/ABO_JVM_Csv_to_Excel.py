@@ -3,51 +3,47 @@ import pandas as pd
 from datetime import datetime
 
 def process_csv(csv_file):
-    # 1. Lire le fichier CSV
+    # Lire le fichier CSV
     df = pd.read_csv(csv_file)
 
-    # 2. Conversion de toutes les colonnes en majuscules
-    df = df.applymap(lambda x: x.upper() if isinstance(x, str) else x)
+    # Vérification : les colonnes nécessaires sont-elles présentes ?
+    required_columns = ['Created at', 'Next order date', 'Status', 'Billing country', 'Delivery country code']
+    for col in required_columns:
+        if col not in df.columns:
+            raise ValueError(f"La colonne obligatoire '{col}' est absente.")
 
-    # 3. Gestion de la colonne "Created at"
-    if 'Created at' in df.columns:
-        # Convertir en datetime en gérant les erreurs
-        df['Created at'] = pd.to_datetime(df['Created at'], errors='coerce')
+    # Conversion sécurisée des colonnes date
+    for date_col in ['Created at', 'Next order date']:
+        df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
+        if df[date_col].isnull().all():
+            raise ValueError(f"Toutes les valeurs dans '{date_col}' sont invalides après conversion.")
 
-        # Supprimer les lignes où la conversion a échoué
-        df = df[df['Created at'].notnull()]
+    # Supprimer les lignes avec 'Created at' ou 'Next order date' invalides
+    initial_rows = len(df)
+    df = df[df['Created at'].notnull() & df['Next order date'].notnull()]
+    remaining_rows = len(df)
+    print(f"Lignes initiales : {initial_rows}, après suppression des NaT : {remaining_rows}")
 
-        # Définir la limite de date pour la comparaison
-        today = datetime.today()
-        date_limite = today.replace(day=4, hour=23, minute=59, second=59)
-
-        # Filtrer les lignes selon la date limite
-        df = df[df['Created at'] <= date_limite]
-    else:
-        raise ValueError("La colonne 'Created at' est absente dans le fichier.")
-
-    # 4. Gestion de la colonne "Next order date"
-    if 'Next order date' in df.columns:
-        df['Next order date'] = pd.to_datetime(df['Next order date'], errors='coerce')
-        if pd.api.types.is_datetime64_any_dtype(df['Next order date']):
-            df['Next order date'] = df['Next order date'].dt.tz_localize(None)
-    else:
-        raise ValueError("La colonne 'Next order date' est absente dans le fichier.")
-
-    # 5. Gestion des abonnements annulés
+    # Définir les limites de date pour la comparaison
+    today = datetime.today()
+    date_limite = today.replace(day=4, hour=23, minute=59, second=59, microsecond=0)
     start_date = today.replace(day=5, hour=0, minute=0, second=0, microsecond=0)
-    cancelled_filter = (df['Status'] == 'CANCELLED') & df['Next order date'].notnull()
+
+    # Filtrer selon 'Created at'
+    df = df[df['Created at'] <= date_limite]
+
+    # Gestion des abonnements annulés
+    cancelled_filter = (df['Status'] == 'CANCELLED') & (df['Next order date'].notnull())
     df = df[~(cancelled_filter & (df['Next order date'] < start_date))]
 
-    # 6. Gestion des champs vides dans "Billing country"
-    if 'Billing country' in df.columns and 'Delivery country code' in df.columns:
-        df['Billing country'] = df.apply(
-            lambda row: "FRANCE" if (pd.isnull(row['Billing country']) or row['Billing country'].strip() == "") 
-            and row['Delivery country code'] == "FR" else row['Billing country'],
-            axis=1
-        )
+    # Gestion des champs vides dans "Billing country"
+    df['Billing country'] = df.apply(
+        lambda row: "FRANCE" if (pd.isnull(row['Billing country']) or row['Billing country'].strip() == "") 
+        and row['Delivery country code'] == "FR" else row['Billing country'],
+        axis=1
+    )
 
-    # 7. Garder uniquement les colonnes spécifiées
+    # Garder uniquement les colonnes spécifiées
     columns_to_keep = [
         "ID", "Customer name", "Delivery address 1", "Delivery address 2", 
         "Delivery zip", "Delivery city", "Delivery province code", 
@@ -55,7 +51,7 @@ def process_csv(csv_file):
     ]
     df = df[columns_to_keep]
 
-    # 8. Renommer les colonnes pour correspondre aux noms finaux
+    # Renommer les colonnes
     column_mapping = {
         "ID": "Customer ID",
         "Customer name": "Delivery name",
@@ -70,7 +66,7 @@ def process_csv(csv_file):
     }
     df = df.rename(columns=column_mapping)
 
-    # Réorganiser les colonnes pour correspondre à l'ordre final souhaité
+    # Réorganiser les colonnes
     final_columns = [
         "Customer ID", "Delivery name", "Delivery address 1", "Delivery address 2", 
         "Delivery zip", "Delivery city", "Delivery province code", 
@@ -79,6 +75,7 @@ def process_csv(csv_file):
     df = df[final_columns]
 
     return df
+
 
 # Interface Streamlit
 st.title("Convertisseur CSV vers Excel et Traitement des Données")
