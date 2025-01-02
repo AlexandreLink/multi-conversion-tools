@@ -48,10 +48,12 @@ if uploaded_file:
         st.write("Liste des abonnements annulés (CANCELLED) :")
         selected_indices = []
         for idx, row in cancelled_df.iterrows():
-            if st.checkbox(
-                f"{row['Customer name']} - {row['Customer email']} (ID: {row['ID']})", 
-                key=f"cancelled_{idx}"
-            ):
+            # Ajouter des informations supplémentaires dans chaque ligne de sélection
+            checkbox_label = (
+                f"ID: {row['ID']} | Nom: {row['Customer name']} | "
+                f"Email: {row['Customer email']} | Next Order Date: {row['Next order date']}"
+            )
+            if st.checkbox(checkbox_label, key=f"cancelled_{idx}"):
                 selected_indices.append(idx)
 
         # Filtrer les abonnements annulés sélectionnés
@@ -76,7 +78,7 @@ if uploaded_file:
         rest_of_world_file = "final_rest_of_world.xlsx"
 
         france_df.to_excel(france_file, index=False)
-        rest_of_world_df.to_excel(rest_of_world_file, index=False)
+        rest_of_world_file.to_excel(rest_of_world_file, index=False)
 
         st.download_button(
             label="Télécharger les données France",
