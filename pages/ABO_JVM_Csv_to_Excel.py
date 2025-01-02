@@ -1,6 +1,13 @@
 import streamlit as st
 import pandas as pd
 
+
+st.set_page_config(
+    layout="wide",  # Augmente la largeur de la page
+    page_title="Gestion des abonnements",  # Titre de la page
+    page_icon="📄"  # Icône
+)
+
 def process_csv(csv_file):
     # Lecture du fichier CSV
     df = pd.read_csv(csv_file)
