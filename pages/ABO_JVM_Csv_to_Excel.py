@@ -5,10 +5,6 @@ def process_csv(csv_file):
     # Lecture du fichier CSV
     df = pd.read_csv(csv_file)
 
-    # Vérification initiale des colonnes disponibles
-    st.write("Colonnes disponibles dans le fichier CSV :")
-    st.write(df.columns)
-
     # Normaliser la colonne 'Status' en majuscules (si elle existe)
     if 'Status' in df.columns:
         df['Status'] = df['Status'].str.upper()
@@ -48,18 +44,18 @@ if uploaded_file:
         st.write("Aperçu des abonnements actifs (ACTIVE) :")
         st.dataframe(active_df)
 
-        # Affichage des abonnements annulés avec sélection manuelle
+        # Sélection des abonnements annulés à inclure
         st.write("Liste des abonnements annulés (CANCELLED) :")
-        selected_rows = st.multiselect(
-            "Sélectionnez les abonnements annulés à inclure dans le fichier final :",
-            cancelled_df.index.tolist(),
-            format_func=lambda x: f"{cancelled_df.loc[x, 'Customer name']} ({cancelled_df.loc[x, 'Status']})",
-        )
+        selected_indices = []
+        for idx, row in cancelled_df.iterrows():
+            if st.checkbox(
+                f"{row['Customer name']} - {row['Customer email']} (ID: {row['ID']})", 
+                key=f"cancelled_{idx}"
+            ):
+                selected_indices.append(idx)
 
-        if selected_rows:
-            selected_cancelled_df = cancelled_df.loc[selected_rows]
-        else:
-            selected_cancelled_df = pd.DataFrame()
+        # Filtrer les abonnements annulés sélectionnés
+        selected_cancelled_df = cancelled_df.loc[selected_indices]
 
         # Fusionner les actifs et les annulés sélectionnés
         final_df = pd.concat([active_df, selected_cancelled_df])
