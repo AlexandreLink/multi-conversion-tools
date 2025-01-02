@@ -1,94 +1,97 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
 
 def process_csv(csv_file):
-    # Charger le fichier CSV
+    # Lecture du fichier CSV
     df = pd.read_csv(csv_file)
 
-    # Étape 1 : Sélection automatique des abonnements actifs
+    # Vérification initiale des colonnes disponibles
+    st.write("Colonnes disponibles dans le fichier CSV :")
+    st.write(df.columns)
+
+    # Normaliser la colonne 'Status' en majuscules (si elle existe)
+    if 'Status' in df.columns:
+        df['Status'] = df['Status'].str.upper()
+    else:
+        st.error("La colonne 'Status' est introuvable dans le fichier CSV.")
+        return None, None
+
+    # Filtrage des abonnements annulés
+    cancelled_df = df[df['Status'] == 'CANCELLED']
+
+    # Diagnostic : Vérifier si des abonnements annulés existent
+    st.write("Aperçu brut des abonnements annulés (avant transformation) :")
+    st.dataframe(cancelled_df)
+
+    if cancelled_df.empty:
+        st.error("Aucun abonnement annulé (CANCELLED) trouvé dans les données.")
+    else:
+        st.success(f"{len(cancelled_df)} abonnements annulés trouvés.")
+
+    # Filtrer les abonnements actifs
     active_df = df[df['Status'] == 'ACTIVE']
 
-    # Étape 2 : Interface pour sélectionner les abonnements annulés
-    cancelled_df = df[df['Status'] == 'CANCELLED']
-    st.write("### Liste des abonnements annulés (`CANCELLED`) :")
-    selected_indices = []
-    for i, row in cancelled_df.iterrows():
-        keep = st.checkbox(f"ID: {row['ID']} | Name: {row['Customer name']} | Next Order: {row['Next order date']}", key=f"cancelled_{i}")
-        if keep:
-            selected_indices.append(i)
+    return active_df, cancelled_df
 
-    # Garder uniquement les `CANCELLED` sélectionnés
-    selected_cancelled_df = cancelled_df.loc[selected_indices]
 
-    # Étape 3 : Fusion des `ACTIVE` et `CANCELLED` sélectionnés
-    final_df = pd.concat([active_df, selected_cancelled_df])
+# Interface utilisateur Streamlit
+st.title("Gestion des abonnements annulés et actifs")
 
-    # Étape 4 : Traitement des colonnes et renommage
-    columns_to_keep = [
-        "ID", "Customer name", "Delivery address 1", "Delivery address 2",
-        "Delivery zip", "Delivery city", "Delivery province code",
-        "Delivery country code", "Billing country", "Delivery interval count"
-    ]
-    final_df = final_df[columns_to_keep]
-
-    column_mapping = {
-        "ID": "Customer ID",
-        "Customer name": "Delivery name",
-        "Delivery address 1": "Delivery address 1",
-        "Delivery address 2": "Delivery address 2",
-        "Delivery zip": "Delivery zip",
-        "Delivery city": "Delivery city",
-        "Delivery province code": "Delivery province code",
-        "Delivery country code": "Delivery country code",
-        "Billing country": "Billing country",
-        "Delivery interval count": "Quantity"
-    }
-    final_df = final_df.rename(columns=column_mapping)
-
-    # Étape 5 : Séparation entre France et Reste du Monde
-    france_df = final_df[final_df['Delivery country code'] == 'FR']
-    rest_of_world_df = final_df[final_df['Delivery country code'] != 'FR']
-
-    # Afficher un aperçu des données traitées
-    st.write("### Aperçu des données finales pour la France :")
-    st.dataframe(france_df)
-    st.write("### Aperçu des données finales pour le reste du monde :")
-    st.dataframe(rest_of_world_df)
-
-    return france_df, rest_of_world_df
-
-# Interface principale
-st.title("Gestion des abonnements avec séparation France / Reste du Monde")
-
-# Téléversement du fichier CSV
-uploaded_file = st.file_uploader("Téléversez le fichier CSV", type="csv")
+# Upload du fichier CSV
+uploaded_file = st.file_uploader("Téléversez le fichier CSV des abonnements", type="csv")
 
 if uploaded_file:
-    # Étape principale
-    france_df, rest_of_world_df = process_csv(uploaded_file)
+    active_df, cancelled_df = process_csv(uploaded_file)
 
-    if not france_df.empty or not rest_of_world_df.empty:
-        # Sauvegarder les données dans des fichiers CSV
-        france_file = "subscriptions_france.csv"
-        rest_of_world_file = "subscriptions_rest_of_world.csv"
+    if active_df is not None and cancelled_df is not None:
+        # Affichage des abonnements actifs
+        st.write("Aperçu des abonnements actifs (ACTIVE) :")
+        st.dataframe(active_df)
 
-        france_df.to_csv(france_file, index=False)
-        rest_of_world_df.to_csv(rest_of_world_file, index=False)
+        # Affichage des abonnements annulés avec sélection manuelle
+        st.write("Liste des abonnements annulés (CANCELLED) :")
+        selected_rows = st.multiselect(
+            "Sélectionnez les abonnements annulés à inclure dans le fichier final :",
+            cancelled_df.index.tolist(),
+            format_func=lambda x: f"{cancelled_df.loc[x, 'Customer name']} ({cancelled_df.loc[x, 'Status']})",
+        )
 
-        # Boutons de téléchargement
-        with open(france_file, "rb") as file:
-            st.download_button(
-                label="Télécharger le fichier France",
-                data=file,
-                file_name=france_file,
-                mime="text/csv"
-            )
+        if selected_rows:
+            selected_cancelled_df = cancelled_df.loc[selected_rows]
+        else:
+            selected_cancelled_df = pd.DataFrame()
 
-        with open(rest_of_world_file, "rb") as file:
-            st.download_button(
-                label="Télécharger le fichier Reste du Monde",
-                data=file,
-                file_name=rest_of_world_file,
-                mime="text/csv"
-            )
+        # Fusionner les actifs et les annulés sélectionnés
+        final_df = pd.concat([active_df, selected_cancelled_df])
+
+        # Séparation des données en France et Reste du Monde
+        france_df = final_df[final_df['Delivery country code'] == 'FR']
+        rest_of_world_df = final_df[final_df['Delivery country code'] != 'FR']
+
+        # Afficher les résultats finaux
+        st.write("Aperçu des données finales pour la France :")
+        st.dataframe(france_df)
+
+        st.write("Aperçu des données finales pour le reste du monde :")
+        st.dataframe(rest_of_world_df)
+
+        # Téléchargement des fichiers finaux
+        france_file = "final_france.xlsx"
+        rest_of_world_file = "final_rest_of_world.xlsx"
+
+        france_df.to_excel(france_file, index=False)
+        rest_of_world_df.to_excel(rest_of_world_file, index=False)
+
+        st.download_button(
+            label="Télécharger les données France",
+            data=open(france_file, "rb"),
+            file_name=france_file,
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+        st.download_button(
+            label="Télécharger les données Reste du Monde",
+            data=open(rest_of_world_file, "rb"),
+            file_name=rest_of_world_file,
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
