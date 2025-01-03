@@ -61,6 +61,9 @@ def prepare_final_files(df):
 # Interface utilisateur Streamlit
 st.title("Gestion des abonnements annulés et actifs")
 
+# Champ pour personnaliser le préfixe des fichiers
+file_prefix = st.text_input("Entrez le préfixe pour les fichiers finaux :", "XXXXX")
+
 # Upload du fichier CSV
 uploaded_file = st.file_uploader("Téléversez le fichier CSV des abonnements", type="csv")
 
@@ -87,23 +90,23 @@ if uploaded_file:
         # Préparer les fichiers finaux
         final_df = prepare_final_files(final_df)
 
-        # Séparation des données en France et Reste du Monde
+        # Séparation des données en France et Étranger
         france_df = final_df[final_df['Delivery country code'] == 'FR']
-        rest_of_world_df = final_df[final_df['Delivery country code'] != 'FR']
+        foreign_df = final_df[final_df['Delivery country code'] != 'FR']
 
         # Afficher les résultats finaux
         st.write("Aperçu des données finales pour la France :")
         st.dataframe(france_df)
 
-        st.write("Aperçu des données finales pour le reste du monde :")
-        st.dataframe(rest_of_world_df)
+        st.write("Aperçu des données finales pour l'étranger :")
+        st.dataframe(foreign_df)
 
         # Téléchargement des fichiers finaux
-        france_file = "final_france.xlsx"
-        rest_of_world_file = "final_rest_of_world.xlsx"
+        france_file = f"{file_prefix}_France.xlsx"
+        foreign_file = f"{file_prefix}_Etranger.xlsx"
 
         france_df.to_excel(france_file, index=False)
-        rest_of_world_df.to_excel(rest_of_world_file, index=False)
+        foreign_df.to_excel(foreign_file, index=False)
 
         st.download_button(
             label="Télécharger les données France",
@@ -113,8 +116,8 @@ if uploaded_file:
         )
 
         st.download_button(
-            label="Télécharger les données Reste du Monde",
-            data=open(rest_of_world_file, "rb"),
-            file_name=rest_of_world_file,
+            label="Télécharger les données Étranger",
+            data=open(foreign_file, "rb"),
+            file_name=foreign_file,
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
