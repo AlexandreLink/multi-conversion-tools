@@ -62,7 +62,7 @@ def prepare_final_files(df):
 st.title("Gestion des abonnements annulés et actifs")
 
 # Champ pour personnaliser le préfixe des fichiers
-file_prefix = st.text_input("Entrez le préfixe pour les fichiers finaux :", "XXXXX")
+file_prefix = st.text_input("Entrez le préfixe pour les fichiers finaux :", "")
 
 # Upload du fichier CSV
 uploaded_file = st.file_uploader("Téléversez le fichier CSV des abonnements", type="csv")
