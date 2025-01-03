@@ -5,10 +5,6 @@ def process_csv(csv_file):
     # Lecture du fichier CSV
     df = pd.read_csv(csv_file)
 
-    # Vérification initiale des colonnes disponibles
-    st.write("Colonnes disponibles dans le fichier CSV :")
-    st.write(df.columns)
-
     # Normaliser la colonne 'Status' en majuscules (si elle existe)
     if 'Status' in df.columns:
         df['Status'] = df['Status'].str.upper()
@@ -20,9 +16,6 @@ def process_csv(csv_file):
     cancelled_df = df[df['Status'] == 'CANCELLED']
 
     # Diagnostic : Vérifier si des abonnements annulés existent
-    st.write("Aperçu brut des abonnements annulés (avant transformation) :")
-    st.dataframe(cancelled_df)
-
     if cancelled_df.empty:
         st.error("Aucun abonnement annulé (CANCELLED) trouvé dans les données.")
     else:
@@ -75,10 +68,6 @@ if uploaded_file:
     active_df, cancelled_df = process_csv(uploaded_file)
 
     if active_df is not None and cancelled_df is not None:
-        # Affichage des abonnements actifs
-        st.write("Aperçu des abonnements actifs (ACTIVE) :")
-        st.dataframe(active_df)
-
         # Sélection des abonnements annulés à inclure
         st.write("Liste des abonnements annulés (CANCELLED) :")
         selected_rows = st.multiselect(
