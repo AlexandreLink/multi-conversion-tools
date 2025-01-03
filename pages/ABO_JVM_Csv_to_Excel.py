@@ -101,23 +101,27 @@ if uploaded_file:
         st.write("Aperçu des données finales pour l'étranger :")
         st.dataframe(foreign_df)
 
-        # Téléchargement des fichiers finaux
-        france_file = f"{file_prefix}_France.xlsx"
-        foreign_file = f"{file_prefix}_Etranger.xlsx"
+        # Vérification si le champ de préfixe est rempli
+        if file_prefix.strip():
+            # Téléchargement des fichiers finaux
+            france_file = f"{file_prefix}_France.xlsx"
+            foreign_file = f"{file_prefix}_Etranger.xlsx"
 
-        france_df.to_excel(france_file, index=False)
-        foreign_df.to_excel(foreign_file, index=False)
+            france_df.to_excel(france_file, index=False)
+            foreign_df.to_excel(foreign_file, index=False)
 
-        st.download_button(
-            label="Télécharger les données France",
-            data=open(france_file, "rb"),
-            file_name=france_file,
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
+            st.download_button(
+                label="Télécharger les données France",
+                data=open(france_file, "rb"),
+                file_name=france_file,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
 
-        st.download_button(
-            label="Télécharger les données Étranger",
-            data=open(foreign_file, "rb"),
-            file_name=foreign_file,
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
+            st.download_button(
+                label="Télécharger les données Étranger",
+                data=open(foreign_file, "rb"),
+                file_name=foreign_file,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        else:
+            st.warning("Veuillez entrer un préfixe pour les fichiers finaux avant de télécharger.")
