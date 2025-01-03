@@ -33,6 +33,37 @@ def process_csv(csv_file):
 
     return active_df, cancelled_df
 
+def prepare_final_files(df):
+    # Renommer les colonnes pour correspondre aux exigences finales
+    column_mapping = {
+        "ID": "Customer ID",
+        "Customer name": "Delivery name",
+        "Delivery address 1": "Delivery address 1",
+        "Delivery address 2": "Delivery address 2",
+        "Delivery zip": "Delivery zip",
+        "Delivery city": "Delivery city",
+        "Delivery province code": "Delivery province code",
+        "Delivery country code": "Delivery country code",
+        "Billing country": "Billing country",
+        "Delivery interval count": "Quantity"
+    }
+
+    # Garder et renommer uniquement les colonnes nécessaires
+    df = df[list(column_mapping.keys())].rename(columns=column_mapping)
+
+    # Compléter les valeurs manquantes dans "Billing country"
+    df['Billing country'] = df.apply(
+        lambda row: "FRANCE" if pd.isnull(row['Billing country']) and row['Delivery country code'] == "FR" else row['Billing country'],
+        axis=1
+    )
+
+    # Réorganiser les colonnes dans l'ordre final
+    final_columns = [
+        "Customer ID", "Delivery name", "Delivery address 1", "Delivery address 2", 
+        "Delivery zip", "Delivery city", "Delivery province code", 
+        "Delivery country code", "Billing country", "Quantity"
+    ]
+    return df[final_columns]
 
 # Interface utilisateur Streamlit
 st.title("Gestion des abonnements annulés et actifs")
@@ -48,12 +79,12 @@ if uploaded_file:
         st.write("Aperçu des abonnements actifs (ACTIVE) :")
         st.dataframe(active_df)
 
-        # Affichage des abonnements annulés avec sélection manuelle
+        # Sélection des abonnements annulés à inclure
         st.write("Liste des abonnements annulés (CANCELLED) :")
         selected_rows = st.multiselect(
             "Sélectionnez les abonnements annulés à inclure dans le fichier final :",
             cancelled_df.index.tolist(),
-            format_func=lambda x: f"ID: {cancelled_df.loc[x, 'ID']} | Nom: {cancelled_df.loc[x, 'Customer name']} | Next Order Update: {cancelled_df.loc[x, 'Next order date']} ({cancelled_df.loc[x, 'Status']})",
+            format_func=lambda x: f"ID: {cancelled_df.loc[x, 'ID']}, {cancelled_df.loc[x, 'Customer name']}, Next Order Date: {cancelled_df.loc[x, 'Next order date']}"
         )
 
         if selected_rows:
@@ -63,6 +94,9 @@ if uploaded_file:
 
         # Fusionner les actifs et les annulés sélectionnés
         final_df = pd.concat([active_df, selected_cancelled_df])
+
+        # Préparer les fichiers finaux
+        final_df = prepare_final_files(final_df)
 
         # Séparation des données en France et Reste du Monde
         france_df = final_df[final_df['Delivery country code'] == 'FR']
