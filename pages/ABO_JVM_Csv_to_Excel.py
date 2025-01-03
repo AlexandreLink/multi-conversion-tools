@@ -53,7 +53,7 @@ if uploaded_file:
         selected_rows = st.multiselect(
             "Sélectionnez les abonnements annulés à inclure dans le fichier final :",
             cancelled_df.index.tolist(),
-            format_func=lambda x: f"{cancelled_df.loc[x, 'Customer name']} ({cancelled_df.loc[x, 'Status']})",
+            format_func=lambda x: f"ID: {cancelled_df.loc[x, 'ID']} | Nom: {cancelled_df.loc[x, 'Customer name']} | Next Order Update: {cancelled_df.loc[x, 'Next order date']} ({cancelled_df.loc[x, 'Status']})",
         )
 
         if selected_rows:
@@ -95,4 +95,3 @@ if uploaded_file:
             file_name=rest_of_world_file,
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
-
