@@ -1,33 +1,40 @@
 import streamlit as st
 import pandas as pd
+from datetime import datetime
 
 def process_csv(csv_file):
-    # Lecture du fichier CSV
+    """Lit et traite le fichier CSV."""
     df = pd.read_csv(csv_file)
 
-    # Normaliser la colonne 'Status' en majuscules (si elle existe)
+    # Normaliser la colonne 'Status' en majuscules
     if 'Status' in df.columns:
         df['Status'] = df['Status'].str.upper()
     else:
         st.error("La colonne 'Status' est introuvable dans le fichier CSV.")
         return None, None
 
-    # Filtrage des abonnements annulés
-    cancelled_df = df[df['Status'] == 'CANCELLED']
+    # Vérifier si "Next order date" est dans les colonnes
+    if 'Next order date' not in df.columns:
+        st.error("La colonne 'Next order date' est introuvable dans le fichier CSV.")
+        return None, None
 
-    # Diagnostic : Vérifier si des abonnements annulés existent
-    if cancelled_df.empty:
-        st.error("Aucun abonnement annulé (CANCELLED) trouvé dans les données.")
-    else:
-        st.success(f"{len(cancelled_df)} abonnements annulés trouvés.")
+    # Conversion de "Next order date" en datetime
+    df['Next order date'] = pd.to_datetime(df['Next order date'], errors='coerce')
 
-    # Filtrer les abonnements actifs
+    # Définition de la date limite (5 du mois en cours)
+    today = datetime.today()
+    start_date = datetime(today.year, today.month, 5)
+
+    # Filtrage des abonnements annulés dont la Next Order Date est >= 5 du mois
+    cancelled_df = df[(df['Status'] == 'CANCELLED') & (df['Next order date'] >= start_date)]
+    
+    # Filtrage des abonnements actifs
     active_df = df[df['Status'] == 'ACTIVE']
 
     return active_df, cancelled_df
 
 def prepare_final_files(df):
-    # Renommer les colonnes pour correspondre aux exigences finales
+    """Prépare le fichier final avec les colonnes nécessaires et renommées."""
     column_mapping = {
         "ID": "Customer ID",
         "Customer name": "Delivery name",
@@ -71,21 +78,11 @@ if uploaded_file:
     active_df, cancelled_df = process_csv(uploaded_file)
 
     if active_df is not None and cancelled_df is not None:
-        # Sélection des abonnements annulés à inclure
-        st.write("Liste des abonnements annulés (CANCELLED) :")
-        selected_rows = st.multiselect(
-            "Sélectionnez les abonnements annulés à inclure dans le fichier final :",
-            cancelled_df.index.tolist(),
-            format_func=lambda x: f"ID: {cancelled_df.loc[x, 'ID']}, {cancelled_df.loc[x, 'Customer name']}, Next Order Date: {cancelled_df.loc[x, 'Next order date']}"
-        )
+        # Vérification et message de confirmation du filtrage automatique
+        st.success(f"{len(cancelled_df)} abonnements annulés sélectionnés automatiquement avec une Next Order Date >= {datetime.today().strftime('%Y-%m-05')}.")
 
-        if selected_rows:
-            selected_cancelled_df = cancelled_df.loc[selected_rows]
-        else:
-            selected_cancelled_df = pd.DataFrame()
-
-        # Fusionner les actifs et les annulés sélectionnés
-        final_df = pd.concat([active_df, selected_cancelled_df])
+        # Fusionner les actifs et les abonnements annulés sélectionnés
+        final_df = pd.concat([active_df, cancelled_df])
 
         # Préparer les fichiers finaux
         final_df = prepare_final_files(final_df)
