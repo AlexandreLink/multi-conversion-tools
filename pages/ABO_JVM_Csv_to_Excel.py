@@ -18,11 +18,17 @@ def process_csv(csv_file):
         st.error("La colonne 'Next order date' est introuvable dans le fichier CSV.")
         return None, None
 
-    # Assurer que "Next order date" est bien au format datetime
+    # Conversion en datetime (avec gestion des erreurs)
     df['Next order date'] = pd.to_datetime(df['Next order date'], errors='coerce')
 
-    # Filtrer les valeurs nulles pour éviter les erreurs
-    df = df[df['Next order date'].notna()]
+    # Supprimer les valeurs nulles pour éviter les erreurs
+    df = df[df['Next order date'].notna()].copy()
+
+    # Vérifier si la colonne est bien du type datetime avant d'appliquer .dt.tz_localize(None)
+    if pd.api.types.is_datetime64_any_dtype(df['Next order date']):
+        df['Next order date'] = df['Next order date'].dt.tz_localize(None)
+    else:
+        st.error("Problème de conversion : 'Next order date' ne contient pas uniquement des dates valides.")
 
     # Supprimer les fuseaux horaires si nécessaire
     df['Next order date'] = df['Next order date'].dt.tz_localize(None)
