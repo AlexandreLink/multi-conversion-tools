@@ -1,102 +1,127 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
 
-# Configuration de la page
-st.set_page_config(
-    layout="wide",  # Largeur étendue
-    page_title="Gestion des abonnements",  # Titre de la page
-    page_icon="📄"  # Icône
-)
-
-# Fonction pour traiter le fichier CSV
 def process_csv(csv_file):
+    # Lecture du fichier CSV
     df = pd.read_csv(csv_file)
 
-    # Vérifier si la colonne 'Status' existe
+    # Normaliser la colonne 'Status' en majuscules (si elle existe)
     if 'Status' in df.columns:
-        df['Status'] = df['Status'].str.upper()  # Normaliser en majuscules
+        df['Status'] = df['Status'].str.upper()
     else:
         st.error("La colonne 'Status' est introuvable dans le fichier CSV.")
         return None, None
 
-    # Vérifier la colonne 'Next order date' et convertir en datetime
-    if 'Next order date' in df.columns:
-        df['Next order date'] = pd.to_datetime(df['Next order date'], errors='coerce', utc=True).dt.tz_localize(None)
+    # Filtrage des abonnements annulés
+    cancelled_df = df[df['Status'] == 'CANCELLED']
+
+    # Diagnostic : Vérifier si des abonnements annulés existent
+    if cancelled_df.empty:
+        st.error("Aucun abonnement annulé (CANCELLED) trouvé dans les données.")
     else:
-        st.error("La colonne 'Next order date' est introuvable dans le fichier CSV.")
-        return None, None
+        st.success(f"{len(cancelled_df)} abonnements annulés trouvés.")
 
-    # Date limite : 5 du mois en cours
-    today = datetime.today()
-    start_date = datetime(today.year, today.month, 5)
+    # Filtrer les abonnements actifs
+    active_df = df[df['Status'] == 'ACTIVE']
 
-    # Filtrage automatique des abonnements annulés
-    cancelled = df[(df['Status'] == 'CANCELLED') & (df['Next order date'] >= start_date)]
-    
-    # Filtrage des abonnements actifs
-    active = df[df['Status'] == 'ACTIVE']
+    return active_df, cancelled_df
 
-    return active, cancelled
+def prepare_final_files(df):
+    # Renommer les colonnes pour correspondre aux exigences finales
+    column_mapping = {
+        "ID": "Customer ID",
+        "Customer name": "Delivery name",
+        "Delivery address 1": "Delivery address 1",
+        "Delivery address 2": "Delivery address 2",
+        "Delivery zip": "Delivery zip",
+        "Delivery city": "Delivery city",
+        "Delivery province code": "Delivery province code",
+        "Delivery country code": "Delivery country code",
+        "Billing country": "Billing country",
+        "Delivery interval count": "Quantity"
+    }
 
-# Interface Streamlit
-st.title("Gestion des abonnements Appstle")
+    # Garder et renommer uniquement les colonnes nécessaires
+    df = df[list(column_mapping.keys())].rename(columns=column_mapping)
 
-# Champ obligatoire pour nommer les fichiers
-file_prefix = st.text_input("Nom du fichier final (obligatoire) :", value="")
+    # Compléter les valeurs manquantes dans "Billing country"
+    df['Billing country'] = df.apply(
+        lambda row: "FRANCE" if pd.isnull(row['Billing country']) and row['Delivery country code'] == "FR" else row['Billing country'],
+        axis=1
+    )
 
-# Téléversement du fichier CSV
-uploaded_file = st.file_uploader("Téléversez le fichier CSV", type="csv")
+    # Réorganiser les colonnes dans l'ordre final
+    final_columns = [
+        "Customer ID", "Delivery name", "Delivery address 1", "Delivery address 2", 
+        "Delivery zip", "Delivery city", "Delivery province code", 
+        "Delivery country code", "Billing country", "Quantity"
+    ]
+    return df[final_columns]
+
+# Interface utilisateur Streamlit
+st.title("Gestion des abonnements annulés et actifs")
+
+# Champ pour personnaliser le préfixe des fichiers
+file_prefix = st.text_input("Entrez le préfixe pour les fichiers finaux :", "")
+
+# Upload du fichier CSV
+uploaded_file = st.file_uploader("Téléversez le fichier CSV des abonnements", type="csv")
 
 if uploaded_file:
     active_df, cancelled_df = process_csv(uploaded_file)
 
     if active_df is not None and cancelled_df is not None:
-        # Affichage des abonnements annulés après filtrage automatique
-        st.subheader("Abonnements annulés filtrés automatiquement :")
-        if cancelled_df.empty:
-            st.info("Aucun abonnement annulé pertinent trouvé après filtrage.")
+        # Sélection des abonnements annulés à inclure
+        st.write("Liste des abonnements annulés (CANCELLED) :")
+        selected_rows = st.multiselect(
+            "Sélectionnez les abonnements annulés à inclure dans le fichier final :",
+            cancelled_df.index.tolist(),
+            format_func=lambda x: f"ID: {cancelled_df.loc[x, 'ID']}, {cancelled_df.loc[x, 'Customer name']}, Next Order Date: {cancelled_df.loc[x, 'Next order date']}"
+        )
+
+        if selected_rows:
+            selected_cancelled_df = cancelled_df.loc[selected_rows]
         else:
-            st.success(f"{len(cancelled_df)} abonnements annulés ajoutés automatiquement.")
-            st.dataframe(cancelled_df[['ID', 'Customer name', 'Customer email', 'Next order date']])
+            selected_cancelled_df = pd.DataFrame()
 
         # Fusionner les actifs et les annulés sélectionnés
-        final_df = pd.concat([active_df, cancelled_df])
+        final_df = pd.concat([active_df, selected_cancelled_df])
+
+        # Préparer les fichiers finaux
+        final_df = prepare_final_files(final_df)
 
         # Séparation des données en France et Étranger
         france_df = final_df[final_df['Delivery country code'] == 'FR']
-        etranger_df = final_df[final_df['Delivery country code'] != 'FR']
+        foreign_df = final_df[final_df['Delivery country code'] != 'FR']
 
-        # Afficher les données finales
-        st.subheader("Aperçu des données finales pour la France :")
-        st.dataframe(france_df[['ID', 'Customer name', 'Delivery address 1', 'Delivery city', 'Delivery zip']].reset_index(drop=True))
+        # Afficher les résultats finaux
+        st.write("Aperçu des données finales pour la France :")
+        st.dataframe(france_df)
 
-        st.subheader("Aperçu des données finales pour l’étranger :")
-        st.dataframe(etranger_df[['ID', 'Customer name', 'Delivery address 1', 'Delivery city', 'Delivery zip']].reset_index(drop=True))
+        st.write("Aperçu des données finales pour l'étranger :")
+        st.dataframe(foreign_df)
 
-        # Vérifier que le nom du fichier est rempli avant d'autoriser le téléchargement
+        # Vérification si le champ de préfixe est rempli
         if file_prefix.strip():
             # Téléchargement des fichiers finaux
             france_file = f"{file_prefix}_France.xlsx"
-            etranger_file = f"{file_prefix}_Etranger.xlsx"
+            foreign_file = f"{file_prefix}_Etranger.xlsx"
 
             france_df.to_excel(france_file, index=False)
-            etranger_df.to_excel(etranger_file, index=False)
+            foreign_df.to_excel(foreign_file, index=False)
 
-            with open(france_file, "rb") as file:
-                st.download_button(
-                    label="Télécharger le fichier pour la France",
-                    data=file,
-                    file_name=france_file,
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
+            st.download_button(
+                label="Télécharger les données France",
+                data=open(france_file, "rb"),
+                file_name=france_file,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
 
-            with open(etranger_file, "rb") as file:
-                st.download_button(
-                    label="Télécharger le fichier pour l’étranger",
-                    data=file,
-                    file_name=etranger_file,
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
+            st.download_button(
+                label="Télécharger les données Étranger",
+                data=open(foreign_file, "rb"),
+                file_name=foreign_file,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
         else:
-            st.error("Veuillez entrer un nom de fichier pour activer les téléchargements.")
+            st.warning("Veuillez entrer un préfixe pour les fichiers finaux avant de télécharger.")
