@@ -13,25 +13,32 @@ def process_csv(csv_file):
         st.error("La colonne 'Status' est introuvable dans le fichier CSV.")
         return None, None
 
-    # Vérifier si "Next order date" est dans les colonnes
+    # Vérifier si "Next order date" est bien dans le fichier
     if 'Next order date' not in df.columns:
         st.error("La colonne 'Next order date' est introuvable dans le fichier CSV.")
         return None, None
 
-    # Conversion de "Next order date" en datetime
+    # Assurer que "Next order date" est bien au format datetime
     df['Next order date'] = pd.to_datetime(df['Next order date'], errors='coerce')
+
+    # Filtrer les valeurs nulles pour éviter les erreurs
+    df = df[df['Next order date'].notna()]
+
+    # Supprimer les fuseaux horaires si nécessaire
+    df['Next order date'] = df['Next order date'].dt.tz_localize(None)
 
     # Définition de la date limite (5 du mois en cours)
     today = datetime.today()
     start_date = datetime(today.year, today.month, 5)
 
-    # Filtrage des abonnements annulés dont la Next Order Date est >= 5 du mois
+    # Filtrage automatique des abonnements annulés dont la Next Order Date >= 5 du mois
     cancelled_df = df[(df['Status'] == 'CANCELLED') & (df['Next order date'] >= start_date)]
     
     # Filtrage des abonnements actifs
     active_df = df[df['Status'] == 'ACTIVE']
 
     return active_df, cancelled_df
+
 
 def prepare_final_files(df):
     """Prépare le fichier final avec les colonnes nécessaires et renommées."""
