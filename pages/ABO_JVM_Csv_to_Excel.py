@@ -38,9 +38,12 @@ def process_csv(csv_file):
     today = datetime.today()
     start_date = datetime(today.year, today.month, 5)
 
-    # Filtrage automatique des abonnements annulés dont la Next Order Date >= 5 du mois
-    cancelled_df = df[(df['Status'] == 'CANCELLED') & (df['Parsed Next Order Date'] >= start_date)]
-    
+    # S'assurer que 'Parsed Next Order Date' est bien du type datetime avant comparaison
+    df['Parsed Next Order Date'] = pd.to_datetime(df['Parsed Next Order Date'], errors='coerce')
+
+    # Comparaison corrigée
+    cancelled_df = df[(df['Status'] == 'CANCELLED') & (df['Parsed Next Order Date'].notna()) & (df['Parsed Next Order Date'] >= start_date)]
+
     # Filtrage des abonnements actifs
     active_df = df[df['Status'] == 'ACTIVE']
 
