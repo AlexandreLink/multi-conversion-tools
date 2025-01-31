@@ -1,37 +1,34 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+from dateutil import parser
+
+
+def convert_to_datetime(date_str):
+    """Convertit une date ISO avec fuseau horaire en datetime sans timezone."""
+    try:
+        return parser.isoparse(date_str).replace(tzinfo=None)
+    except Exception:
+        return None  # Retourne None si la conversion échoue
+
 
 def process_csv(csv_file):
     """Lit et traite le fichier CSV."""
     df = pd.read_csv(csv_file)
 
+    # Vérifier si les colonnes essentielles sont présentes
+    required_columns = {'Status', 'Next order date'}
+    missing_columns = required_columns - set(df.columns)
+    if missing_columns:
+        st.error(f"Colonnes manquantes dans le fichier CSV : {', '.join(missing_columns)}")
+        return None, None
+
     # Normaliser la colonne 'Status' en majuscules
-    if 'Status' in df.columns:
-        df['Status'] = df['Status'].str.upper()
-    else:
-        st.error("La colonne 'Status' est introuvable dans le fichier CSV.")
-        return None, None
-
-    # Vérifier si "Next order date" est bien dans le fichier
-    if 'Next order date' not in df.columns:
-        st.error("La colonne 'Next order date' est introuvable dans le fichier CSV.")
-        return None, None
-
-    # Conversion en datetime (avec gestion des erreurs)
-    df['Next order date'] = pd.to_datetime(df['Next order date'], errors='coerce')
-
-    # Supprimer les valeurs nulles pour éviter les erreurs
-    df = df[df['Next order date'].notna()].copy()
-
-    # Vérifier si la colonne est bien du type datetime avant d'appliquer .dt.tz_localize(None)
-    if pd.api.types.is_datetime64_any_dtype(df['Next order date']):
-        df['Next order date'] = df['Next order date'].dt.tz_localize(None)
-    else:
-        st.error("Problème de conversion : 'Next order date' ne contient pas uniquement des dates valides.")
-
-    # Supprimer les fuseaux horaires si nécessaire
-    df['Next order date'] = df['Next order date'].dt.tz_localize(None)
+    df['Status'] = df['Status'].str.upper()
+    
+    # Conversion en datetime avec gestion des erreurs
+    df['Next order date'] = df['Next order date'].astype(str).apply(convert_to_datetime)
+    df = df[df['Next order date'].notna()].copy()  # Supprime les valeurs invalides
 
     # Définition de la date limite (5 du mois en cours)
     today = datetime.today()
@@ -78,6 +75,7 @@ def prepare_final_files(df):
     ]
     return df[final_columns]
 
+
 # Interface utilisateur Streamlit
 st.title("Gestion des abonnements annulés et actifs")
 
@@ -92,7 +90,7 @@ if uploaded_file:
 
     if active_df is not None and cancelled_df is not None:
         # Vérification et message de confirmation du filtrage automatique
-        st.success(f"{len(cancelled_df)} abonnements annulés sélectionnés automatiquement avec une Next Order Date >= {datetime.today().strftime('%Y-%m-05')}.")
+        st.success(f"{len(cancelled_df)} abonnements annulés sélectionnés automatiquement avec une Next Order Date >= {datetime.today().strftime('%Y-%m-05')}")
 
         # Fusionner les actifs et les abonnements annulés sélectionnés
         final_df = pd.concat([active_df, cancelled_df])
