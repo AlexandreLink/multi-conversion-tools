@@ -1,7 +1,16 @@
 import streamlit as st
 import pandas as pd
-from dateutil.parser import parse
-from datetime import datetime
+
+# Fonction pour reformater la date pour les abonnements annulés
+def format_date(date_str):
+    """ Reformate une date ISO en JJ/MM/AAAA. """
+    if isinstance(date_str, str) and "T" in date_str:
+        try:
+            parts = date_str.split("T")[0].split("-")  # Extraire AAAA-MM-JJ
+            return f"{parts[2]}/{parts[1]}/{parts[0]}"  # Reformater en JJ/MM/AAAA
+        except Exception:
+            return date_str  # Si erreur, conserver tel quel
+    return date_str
 
 def process_csv(csv_file):
     """Lit et traite le fichier CSV."""
@@ -12,40 +21,12 @@ def process_csv(csv_file):
         st.error("La colonne 'Next order date' est introuvable dans le fichier CSV.")
         return None, None
 
-    # Debug : Afficher un aperçu brut des valeurs de 'Next order date'
-    st.write("🔍 Aperçu brut de 'Next order date' avant conversion :", df['Next order date'].head(10))
+    # Appliquer le formatage UNIQUEMENT sur les abonnements annulés
+    df.loc[df['Status'] == 'CANCELLED', 'Next order date'] = df['Next order date'].apply(format_date)
 
-    # Fonction de conversion sécurisée avec gestion des erreurs
-    def safe_parse(date_str):
-        try:
-            return parse(date_str)  # Tente de convertir en datetime
-        except Exception:
-            return None  # Retourne None si invalide
-
-    # Appliquer la conversion
-    df['Parsed Next Order Date'] = df['Next order date'].apply(safe_parse)
-
-    # Identifier les valeurs invalides
-    invalid_dates = df[df['Parsed Next Order Date'].isna()]
-
-    if not invalid_dates.empty:
-        st.warning(f"⚠️ {len(invalid_dates)} valeurs invalides détectées dans 'Next order date'.")
-        st.write("❌ Valeurs invalides détectées :", invalid_dates[['ID', 'Next order date']])
-    else:
-        st.success("✅ Toutes les valeurs de 'Next order date' sont valides.")
-
-    # Définition de la date limite (5 du mois en cours)
-    today = datetime.today()
-    start_date = datetime(today.year, today.month, 5)
-
-    # S'assurer que 'Parsed Next Order Date' est bien du type datetime avant comparaison
-    df['Parsed Next Order Date'] = pd.to_datetime(df['Parsed Next Order Date'], errors='coerce')
-
-    # Comparaison corrigée
-    cancelled_df = df[(df['Status'] == 'CANCELLED') & (df['Parsed Next Order Date'].notna()) & (df['Parsed Next Order Date'] >= start_date)]
-
-    # Filtrage des abonnements actifs
+    # Filtrer les abonnements actifs et annulés
     active_df = df[df['Status'] == 'ACTIVE']
+    cancelled_df = df[df['Status'] == 'CANCELLED']
 
     return active_df, cancelled_df
 
@@ -94,8 +75,7 @@ if uploaded_file:
     active_df, cancelled_df = process_csv(uploaded_file)
 
     if active_df is not None and cancelled_df is not None:
-        # Vérification et message de confirmation du filtrage automatique
-        st.success(f"{len(cancelled_df)} abonnements annulés sélectionnés automatiquement avec une Next Order Date >= {datetime.today().strftime('%Y-%m-05')}.")
+        st.success(f"{len(cancelled_df)} abonnements annulés sélectionnés automatiquement.")
 
         # Fusionner les actifs et les abonnements annulés sélectionnés
         final_df = pd.concat([active_df, cancelled_df])
