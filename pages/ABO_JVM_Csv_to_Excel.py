@@ -1,53 +1,50 @@
 import streamlit as st
 import pandas as pd
-from dateutil.parser import parse
 from datetime import datetime
 
 def process_csv(csv_file):
     """Lit et traite le fichier CSV."""
     df = pd.read_csv(csv_file)
 
-    # Vérifier si la colonne 'Next order date' est bien présente
+    # Normaliser la colonne 'Status' en majuscules
+    if 'Status' in df.columns:
+        df['Status'] = df['Status'].str.upper()
+    else:
+        st.error("La colonne 'Status' est introuvable dans le fichier CSV.")
+        return None, None
+
+    # Vérifier si "Next order date" est bien dans le fichier
     if 'Next order date' not in df.columns:
         st.error("La colonne 'Next order date' est introuvable dans le fichier CSV.")
         return None, None
 
-    # Debug : Afficher un aperçu brut des valeurs de 'Next order date'
-    st.write("🔍 Aperçu brut de 'Next order date' avant conversion :", df['Next order date'].head(10))
+    # Conversion en datetime (avec gestion des erreurs)
+    df['Next order date'] = pd.to_datetime(df['Next order date'], errors='coerce')
 
-    # Fonction de conversion sécurisée avec gestion des erreurs
-    def safe_parse(date_str):
-        try:
-            return parse(date_str)  # Tente de convertir en datetime
-        except Exception:
-            return None  # Retourne None si invalide
+    # Supprimer les valeurs nulles pour éviter les erreurs
+    df = df[df['Next order date'].notna()].copy()
 
-    # Appliquer la conversion
-    df['Parsed Next Order Date'] = df['Next order date'].apply(safe_parse)
-
-    # Identifier les valeurs invalides
-    invalid_dates = df[df['Parsed Next Order Date'].isna()]
-
-    if not invalid_dates.empty:
-        st.warning(f"⚠️ {len(invalid_dates)} valeurs invalides détectées dans 'Next order date'.")
-        st.write("❌ Valeurs invalides détectées :", invalid_dates[['ID', 'Next order date']])
+    # Vérifier si la colonne est bien du type datetime avant d'appliquer .dt.tz_localize(None)
+    if pd.api.types.is_datetime64_any_dtype(df['Next order date']):
+        df['Next order date'] = df['Next order date'].dt.tz_localize(None)
     else:
-        st.success("✅ Toutes les valeurs de 'Next order date' sont valides.")
+        st.error("Problème de conversion : 'Next order date' ne contient pas uniquement des dates valides.")
+
+    # Supprimer les fuseaux horaires si nécessaire
+    df['Next order date'] = df['Next order date'].dt.tz_localize(None)
 
     # Définition de la date limite (5 du mois en cours)
     today = datetime.today()
     start_date = datetime(today.year, today.month, 5)
 
-    # S'assurer que 'Parsed Next Order Date' est bien du type datetime avant comparaison
-    df['Parsed Next Order Date'] = pd.to_datetime(df['Parsed Next Order Date'], errors='coerce')
-
-    # Comparaison corrigée
-    cancelled_df = df[(df['Status'] == 'CANCELLED') & (df['Parsed Next Order Date'].notna()) & (df['Parsed Next Order Date'] >= start_date)]
-
+    # Filtrage automatique des abonnements annulés dont la Next Order Date >= 5 du mois
+    cancelled_df = df[(df['Status'] == 'CANCELLED') & (df['Next order date'] >= start_date)]
+    
     # Filtrage des abonnements actifs
     active_df = df[df['Status'] == 'ACTIVE']
 
     return active_df, cancelled_df
+
 
 def prepare_final_files(df):
     """Prépare le fichier final avec les colonnes nécessaires et renommées."""
