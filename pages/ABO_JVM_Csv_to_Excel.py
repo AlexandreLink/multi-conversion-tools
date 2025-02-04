@@ -45,16 +45,16 @@ def ask_openai_for_filtering(cancelled_df):
 
     # Construire une requête textuelle pour OpenAI
     prompt = f"""
+    Tu es un assistant spécialisé en traitement de données. 
+
     Voici une liste d'abonnements annulés avec leur 'Next order date'.
     Filtre uniquement ceux dont 'Next order date' est **après** le 5 du mois en cours ({start_date}).
-    Retourne uniquement les ID des abonnements à conserver.
+    Retourne **uniquement** un JSON valide contenant un tableau d'IDs.
 
-    Exemple :
-    ID: 12345, Next Order Date: 2024-04-06
-    ID: 67890, Next Order Date: 2024-04-02
-
-    Doit retourner uniquement :
-    [12345]
+    EXEMPLE DE RÉPONSE ATTENDUE :
+    ```json
+    {{ "selected_ids": [20338901319, 20037239111, 20511621447] }}
+    N'inclus aucun autre texte en dehors du JSON. N'écris pas de phrase explicative, uniquement le JSON. Voici les abonnements :
     """
 
     for index, row in cancelled_df.iterrows():
@@ -73,14 +73,19 @@ def ask_openai_for_filtering(cancelled_df):
     # Affichage de la réponse brute d'OpenAI
     st.write("🔍 **Réponse brute d'OpenAI :**", response)
 
-    # Récupérer et traiter la réponse de l'IA
-    output = response.choices[0].message.content.strip()
+    import json
 
-    # Extraire les ID retournés par l'IA
-    selected_ids = [int(s) for s in output.replace("[", "").replace("]", "").split(',') if s.strip().isdigit()]
+    # Extraire et analyser correctement le JSON retourné par GPT
+    try:
+        json_response = json.loads(response.choices[0].message.content)
+        selected_ids = json_response.get("selected_ids", [])
+    except json.JSONDecodeError:
+        st.error("❌ Erreur : OpenAI n'a pas retourné un JSON valide.")
+        selected_ids = []
 
     # Filtrer les abonnements annulés sélectionnés
     selected_cancelled_df = cancelled_df[cancelled_df['ID'].isin(selected_ids)]
+
 
     # Exclure Brice N'Guessan après la réponse d'OpenAI (par sécurité)
     selected_cancelled_df = selected_cancelled_df[~selected_cancelled_df['Customer name'].str.contains("Brice N Guessan", case=False, na=False)]
