@@ -4,6 +4,7 @@ import openai
 from datetime import datetime
 import os
 import json
+import re
 
 
 # Configuration de l'API OpenAI (utilisation de st.secrets pour la clé API sur Streamlit Cloud)
