@@ -41,16 +41,18 @@ def ask_openai_for_filtering(cancelled_df):
     start_date = datetime(today.year, today.month, 5).strftime('%Y-%m-%d')
 
     # Afficher la liste des abonnements annulés envoyés à OpenAI avec nombre de lignes
+    cancelled_df['Next order date'] = pd.to_datetime(cancelled_df['Next order date'], errors='coerce')
     st.write(f"📋 **Liste des abonnements annulés envoyés à OpenAI ({len(cancelled_df)} lignes) :**")
-    st.dataframe(cancelled_df[['ID', 'Customer name', 'Next order date']])
+    st.dataframe(cancelled_df[['ID', 'Customer name', 'Next order date']].head(20))
 
     # Construire une requête textuelle pour OpenAI
     prompt = f"""
     Tu es un assistant chargé de filtrer les abonnements annulés. 
     Ta seule tâche est d'extraire les ID des abonnements dont la 'Next Order Date' est **après** le 5 du mois en cours ({start_date}).
 
-    🔹 **Format de réponse attendu :** Une simple liste d'ID séparés par des virgules (ex : `12345,67890,54321`).  
-    🔹 **Interdictions :** Pas de texte explicatif, pas de mise en forme, uniquement les ID séparés par des virgules.  
+    🔹 **Format de réponse attendu :** Une simple liste d'ID séparés par des virgules **et RIEN D'AUTRE**.  
+    🔹 **Exemple :** `12345,67890,54321`.  
+    🔹 **Attention :** Vérifie bien chaque date avant de répondre ! Ne manque **aucun** ID valide.
 
     Voici la liste des abonnements annulés :  
     """
@@ -59,6 +61,7 @@ def ask_openai_for_filtering(cancelled_df):
         prompt += f"{row['ID']} ({row['Next order date']})\n"
 
     prompt += "\n🔹 Maintenant, donne-moi uniquement la liste des ID, séparés par des virgules."
+
 
     client = openai.OpenAI(api_key=openai.api_key)  # Crée un client OpenAI
 
