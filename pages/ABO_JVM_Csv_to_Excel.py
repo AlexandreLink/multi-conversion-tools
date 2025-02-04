@@ -27,7 +27,7 @@ def process_csv(csv_file):
     cancelled_df = df[df['Status'] == 'CANCELLED']
 
     # Exclure Brice N'Guessan des abonnements annulés
-    cancelled_df = cancelled_df[~cancelled_df['Customer name'].str.contains("Brice N'Guessan", case=False, na=False)]
+    cancelled_df = cancelled_df[~cancelled_df['Customer name'].str.contains("Brice N Guessan", case=False, na=False)]
 
     return active_df, cancelled_df
 
@@ -83,7 +83,7 @@ def ask_openai_for_filtering(cancelled_df):
     selected_cancelled_df = cancelled_df[cancelled_df['ID'].isin(selected_ids)]
 
     # Exclure Brice N'Guessan après la réponse d'OpenAI (par sécurité)
-    selected_cancelled_df = selected_cancelled_df[~selected_cancelled_df['Customer name'].str.contains("Brice N'Guessan", case=False, na=False)]
+    selected_cancelled_df = selected_cancelled_df[~selected_cancelled_df['Customer name'].str.contains("Brice N Guessan", case=False, na=False)]
 
 
     # Afficher la liste des abonnements annulés sélectionnés avec nombre de lignes
