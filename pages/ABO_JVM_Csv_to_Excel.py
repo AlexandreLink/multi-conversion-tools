@@ -5,7 +5,7 @@ from datetime import datetime
 import os
 
 # Configuration de l'API OpenAI (utilisation de st.secrets pour la clé API sur Streamlit Cloud)
-openai.api_key = os.getenv("OPENAI_API_KEY", st.secrets["openai_api_key"])
+openai.api_key = os.getenv("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY")
 
 def process_csv(csv_file):
     """Lit et traite le fichier CSV."""
