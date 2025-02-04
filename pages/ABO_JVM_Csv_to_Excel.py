@@ -29,6 +29,9 @@ def process_csv(csv_file):
 
     # Exclure Brice N Guessan des abonnements annulés
     cancelled_df = cancelled_df[~cancelled_df['Customer name'].str.contains("Brice N Guessan", case=False, na=False)]
+    
+    # Supprimer les doublons basés sur le Customer name (conserver le premier)
+    cancelled_df = cancelled_df.drop_duplicates(subset=['Customer name'], keep='first')
 
     return active_df, cancelled_df
 
