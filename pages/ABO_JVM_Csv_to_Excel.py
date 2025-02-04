@@ -36,8 +36,8 @@ def ask_openai_for_filtering(cancelled_df):
     today = datetime.today()
     start_date = datetime(today.year, today.month, 5).strftime('%Y-%m-%d')
 
-    # Afficher la liste des abonnements annulés envoyés à OpenAI
-    st.write("📋 **Liste des abonnements annulés envoyés à OpenAI :**")
+    # Afficher la liste des abonnements annulés envoyés à OpenAI avec nombre de lignes
+    st.write(f"📋 **Liste des abonnements annulés envoyés à OpenAI ({len(cancelled_df)} lignes) :**")
     st.dataframe(cancelled_df[['ID', 'Next order date']])
 
     # Construire une requête textuelle pour OpenAI
@@ -79,8 +79,8 @@ def ask_openai_for_filtering(cancelled_df):
     # Filtrer les abonnements annulés sélectionnés
     selected_cancelled_df = cancelled_df[cancelled_df['ID'].isin(selected_ids)]
 
-    # Afficher la liste des abonnements annulés sélectionnés
-    st.write("✅ **Abonnements annulés sélectionnés par OpenAI :**")
+    # Afficher la liste des abonnements annulés sélectionnés avec nombre de lignes
+    st.write(f"✅ **Abonnements annulés sélectionnés par OpenAI ({len(selected_cancelled_df)} lignes) :**")
     st.dataframe(selected_cancelled_df[['ID', 'Next order date']])
 
     return selected_cancelled_df
@@ -132,10 +132,10 @@ if uploaded_file:
         france_df = final_df[final_df['Delivery country code'] == 'FR']
         foreign_df = final_df[final_df['Delivery country code'] != 'FR']
 
-        st.write("📌 **Aperçu des données finales pour la France :**")
+        st.write(f"📌 **Aperçu des données finales pour la France ({len(france_df)} lignes) :**")
         st.dataframe(france_df)
 
-        st.write("📌 **Aperçu des données finales pour l'étranger :**")
+        st.write(f"📌 **Aperçu des données finales pour l'étranger ({len(foreign_df)} lignes) :**")
         st.dataframe(foreign_df)
 
         if file_prefix.strip():
