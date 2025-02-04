@@ -77,9 +77,6 @@ def ask_openai_for_filtering(cancelled_df):
         ]
     )
 
-    # Affichage de la réponse brute d'OpenAI
-    st.write("🔍 **Réponse brute d'OpenAI :**", response)
-
     # Nettoyage et extraction des ID de la réponse
     output = response.choices[0].message.content.strip()
 
