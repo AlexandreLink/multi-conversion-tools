@@ -3,9 +3,7 @@ import pandas as pd
 import openai
 from datetime import datetime
 import os
-import json
 import re
-
 
 # Configuration de l'API OpenAI (utilisation de st.secrets pour la clé API sur Streamlit Cloud)
 openai.api_key = os.getenv("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY")
@@ -29,7 +27,7 @@ def process_csv(csv_file):
     active_df = df[df['Status'] == 'ACTIVE']
     cancelled_df = df[df['Status'] == 'CANCELLED']
 
-    # Exclure Brice N'Guessan des abonnements annulés
+    # Exclure Brice N Guessan des abonnements annulés
     cancelled_df = cancelled_df[~cancelled_df['Customer name'].str.contains("Brice N Guessan", case=False, na=False)]
 
     return active_df, cancelled_df
@@ -51,8 +49,7 @@ def ask_openai_for_filtering(cancelled_df):
     Tu es un assistant chargé de filtrer les abonnements annulés. 
     Ta seule tâche est d'extraire les ID des abonnements dont la 'Next Order Date' est **après** le 5 du mois en cours ({start_date}).
 
-    🔹 **Format de réponse attendu :** Une simple liste d'ID séparés par des virgules.  
-    🔹 **Exemple :** `12345,67890,54321`  
+    🔹 **Format de réponse attendu :** Une simple liste d'ID séparés par des virgules (ex : `12345,67890,54321`).  
     🔹 **Interdictions :** Pas de texte explicatif, pas de mise en forme, uniquement les ID séparés par des virgules.  
 
     Voici la liste des abonnements annulés :  
@@ -61,8 +58,7 @@ def ask_openai_for_filtering(cancelled_df):
     for index, row in cancelled_df.iterrows():
         prompt += f"{row['ID']} ({row['Next order date']})\n"
 
-    prompt += "\n🔹 **Maintenant, donne-moi uniquement la liste des ID, sans autre texte.**"
-
+    prompt += "\n🔹 Maintenant, donne-moi uniquement la liste des ID, séparés par des virgules."
 
     client = openai.OpenAI(api_key=openai.api_key)  # Crée un client OpenAI
 
@@ -77,34 +73,23 @@ def ask_openai_for_filtering(cancelled_df):
     # Affichage de la réponse brute d'OpenAI
     st.write("🔍 **Réponse brute d'OpenAI :**", response)
 
-    # Nettoyer la réponse de GPT pour garantir un JSON correct
+    # Nettoyage et extraction des ID de la réponse
     output = response.choices[0].message.content.strip()
 
-    # Supprimer les balises de code Markdown (```json ... ```)
-    output = re.sub(r'```json\n?|```', '', output).strip()
+    # Utilisation d'une regex pour extraire uniquement les nombres
+    selected_ids = re.findall(r'\d+', output)
 
-    # Extraire et analyser correctement le JSON retourné par GPT
-    try:
-        json_response = json.loads(response.choices[0].message.content)
-        selected_ids = json_response.get("selected_ids", [])
-    except json.JSONDecodeError:
-        st.error("❌ Erreur : OpenAI n'a pas retourné un JSON valide.")
-        selected_ids = []
+    # Convertir en entiers
+    selected_ids = [int(id_) for id_ in selected_ids]
 
     # Filtrer les abonnements annulés sélectionnés
     selected_cancelled_df = cancelled_df[cancelled_df['ID'].isin(selected_ids)]
-
-
-    # Exclure Brice N'Guessan après la réponse d'OpenAI (par sécurité)
-    selected_cancelled_df = selected_cancelled_df[~selected_cancelled_df['Customer name'].str.contains("Brice N Guessan", case=False, na=False)]
-
 
     # Afficher la liste des abonnements annulés sélectionnés avec nombre de lignes
     st.write(f"✅ **Abonnements annulés sélectionnés par OpenAI ({len(selected_cancelled_df)} lignes) :**")
     st.dataframe(selected_cancelled_df[['ID', 'Next order date']])
 
     return selected_cancelled_df
-
 
 def prepare_final_files(df):
     """Prépare le fichier final avec les colonnes nécessaires et renommées."""
