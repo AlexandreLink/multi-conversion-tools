@@ -3,6 +3,8 @@ import pandas as pd
 import openai
 from datetime import datetime
 import os
+import json
+
 
 # Configuration de l'API OpenAI (utilisation de st.secrets pour la clé API sur Streamlit Cloud)
 openai.api_key = os.getenv("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY")
@@ -72,8 +74,6 @@ def ask_openai_for_filtering(cancelled_df):
 
     # Affichage de la réponse brute d'OpenAI
     st.write("🔍 **Réponse brute d'OpenAI :**", response)
-
-    import json
 
     # Extraire et analyser correctement le JSON retourné par GPT
     try:
