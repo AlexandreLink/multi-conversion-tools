@@ -48,6 +48,9 @@ def ask_openai_for_filtering(cancelled_df):
     # Supprimer les doublons basés sur le Customer name (conserver le premier)
     cancelled_df = cancelled_df.drop_duplicates(subset=['Customer name'], keep='first')
 
+    # Exclure Brice N Guessan des abonnements annulés
+    cancelled_df = cancelled_df[~cancelled_df['Customer name'].str.contains("Brice N Guessan", case=False, na=False)]
+
     # Construire une requête textuelle pour OpenAI
     prompt = f"""
     Tu es un assistant chargé de filtrer les abonnements annulés. 
