@@ -29,9 +29,6 @@ def process_csv(csv_file):
 
     # Exclure Brice N Guessan des abonnements annulés
     cancelled_df = cancelled_df[~cancelled_df['Customer name'].str.contains("Brice N Guessan", case=False, na=False)]
-    
-    # Supprimer les doublons basés sur le Customer name (conserver le premier)
-    cancelled_df = cancelled_df.drop_duplicates(subset=['Customer name'], keep='first')
 
     return active_df, cancelled_df
 
@@ -47,6 +44,9 @@ def ask_openai_for_filtering(cancelled_df):
     cancelled_df['Next order date'] = pd.to_datetime(cancelled_df['Next order date'], errors='coerce')
     st.write(f"📋 **Liste des abonnements annulés envoyés à OpenAI ({len(cancelled_df)} lignes) :**")
     st.dataframe(cancelled_df[['ID', 'Customer name', 'Next order date']].head(20))
+
+    # Supprimer les doublons basés sur le Customer name (conserver le premier)
+    cancelled_df = cancelled_df.drop_duplicates(subset=['Customer name'], keep='first')
 
     # Construire une requête textuelle pour OpenAI
     prompt = f"""
