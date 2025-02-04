@@ -29,7 +29,7 @@ def process_csv(csv_file):
     return active_df, cancelled_df
 
 def ask_openai_for_filtering(cancelled_df):
-    """Envoie les dates des abonnements annulés à OpenAI et récupère la liste des ID à réintégrer."""
+    """Envoie les données des abonnements annulés à OpenAI et récupère la liste des ID à réintégrer."""
     if cancelled_df.empty:
         return pd.DataFrame()
     
@@ -37,7 +37,7 @@ def ask_openai_for_filtering(cancelled_df):
     start_date = datetime(today.year, today.month, 5).strftime('%Y-%m-%d')
     
     # Construire une requête textuelle pour OpenAI
-    prompt = """
+    prompt = f"""
     Voici une liste d'abonnements annulés avec leur 'Next order date'.
     Filtre uniquement ceux dont 'Next order date' est **avant** le 5 du mois en cours ({start_date}).
     Retourne uniquement les ID des abonnements à conserver.
@@ -48,12 +48,14 @@ def ask_openai_for_filtering(cancelled_df):
     
     Doit retourner uniquement :
     [12345]
-    """.format(start_date=start_date)
-    
+    """
+
     for index, row in cancelled_df.iterrows():
         prompt += f"ID: {row['ID']}, Next Order Date: {row['Next order date']}\n"
     
-    response = openai.ChatCompletion.create(
+    client = openai.OpenAI(api_key=openai.api_key)  # Crée un client OpenAI
+    
+    response = client.chat.completions.create(
         model="gpt-4-turbo",
         messages=[
             {"role": "system", "content": "Tu es un assistant de filtrage de données."},
@@ -61,15 +63,14 @@ def ask_openai_for_filtering(cancelled_df):
         ]
     )
     
-    st.write("🔍 Réponse brute d'OpenAI :", response)
-
     # Récupérer et traiter la réponse de l'IA
-    output = response['choices'][0]['message']['content'].strip()
-    
+    output = response.choices[0].message.content.strip()
+
     # Extraire les ID retournés par l'IA
     selected_ids = [int(s) for s in output.replace("[", "").replace("]", "").split(',') if s.strip().isdigit()]
     
     return cancelled_df[cancelled_df['ID'].isin(selected_ids)]
+
 
 def prepare_final_files(df):
     """Prépare le fichier final avec les colonnes nécessaires et renommées."""
