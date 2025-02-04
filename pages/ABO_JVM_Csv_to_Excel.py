@@ -27,9 +27,6 @@ def process_csv(csv_file):
     active_df = df[df['Status'] == 'ACTIVE']
     cancelled_df = df[df['Status'] == 'CANCELLED']
 
-    # Exclure Brice N Guessan des abonnements annulés
-    cancelled_df = cancelled_df[~cancelled_df['Customer name'].str.contains("Brice N Guessan", case=False, na=False)]
-
     return active_df, cancelled_df
 
 def ask_openai_for_filtering(cancelled_df):
