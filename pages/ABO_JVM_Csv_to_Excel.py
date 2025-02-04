@@ -48,20 +48,21 @@ def ask_openai_for_filtering(cancelled_df):
 
     # Construire une requête textuelle pour OpenAI
     prompt = f"""
-    Tu es un assistant spécialisé en traitement de données. 
+    Tu es un assistant chargé de filtrer les abonnements annulés. 
+    Ta seule tâche est d'extraire les ID des abonnements dont la 'Next Order Date' est **après** le 5 du mois en cours ({start_date}).
 
-    Voici une liste d'abonnements annulés avec leur 'Next order date'.
-    Filtre uniquement ceux dont 'Next order date' est **après** le 5 du mois en cours ({start_date}).
-    Retourne **uniquement** un JSON valide contenant un tableau d'IDs.
+    🔹 **Format de réponse attendu :** Une simple liste d'ID séparés par des virgules.  
+    🔹 **Exemple :** `12345,67890,54321`  
+    🔹 **Interdictions :** Pas de texte explicatif, pas de mise en forme, uniquement les ID séparés par des virgules.  
 
-    EXEMPLE DE RÉPONSE ATTENDUE :
-    ```json
-    {{ "selected_ids": [20338901319, 20037239111, 20511621447] }}
-    N'inclus aucun autre texte en dehors du JSON. N'écris pas de phrase explicative, uniquement le JSON. Voici les abonnements :
+    Voici la liste des abonnements annulés :  
     """
 
     for index, row in cancelled_df.iterrows():
-        prompt += f"ID: {row['ID']}, Next Order Date: {row['Next order date']}\n"
+        prompt += f"{row['ID']} ({row['Next order date']})\n"
+
+    prompt += "\n🔹 **Maintenant, donne-moi uniquement la liste des ID, sans autre texte.**"
+
 
     client = openai.OpenAI(api_key=openai.api_key)  # Crée un client OpenAI
 
