@@ -63,6 +63,8 @@ def ask_openai_for_filtering(cancelled_df):
         ]
     )
     
+    st.write("🔍 Réponse brute d'OpenAI :", response)
+
     # Récupérer et traiter la réponse de l'IA
     output = response.choices[0].message.content.strip()
 
