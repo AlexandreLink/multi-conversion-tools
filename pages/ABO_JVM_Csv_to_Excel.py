@@ -75,6 +75,12 @@ def ask_openai_for_filtering(cancelled_df):
     # Affichage de la réponse brute d'OpenAI
     st.write("🔍 **Réponse brute d'OpenAI :**", response)
 
+    # Nettoyer la réponse de GPT pour garantir un JSON correct
+    output = response.choices[0].message.content.strip()
+
+    # Supprimer les balises de code Markdown (```json ... ```)
+    output = re.sub(r'```json\n?|```', '', output).strip()
+
     # Extraire et analyser correctement le JSON retourné par GPT
     try:
         json_response = json.loads(response.choices[0].message.content)
