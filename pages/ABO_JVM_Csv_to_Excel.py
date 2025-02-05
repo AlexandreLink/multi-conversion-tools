@@ -51,8 +51,9 @@ def ask_openai_for_filtering(cancelled_df):
     cancelled_df['Next order date'] = pd.to_datetime(cancelled_df['Next order date'], errors='coerce')
 
     # Afficher la liste des abonnements annulés envoyés à OpenAI
-    st.write(f"📋 **Total abonnements annulés avant envoi à OpenAI : {len(cancelled_df)} lignes**")
-    st.dataframe(cancelled_df[['ID', 'Customer name', 'Next order date']].head(20))
+    st.write("📝 **Liste des abonnements annulés envoyés à OpenAI (Extrait)**")
+    st.dataframe(cancelled_df[['ID', 'Customer name', 'Next order date']])
+
 
     # Supprimer les doublons basés sur le Customer name (conserver le premier)
     cancelled_df = cancelled_df.drop_duplicates(subset=['Customer name'], keep='first')
