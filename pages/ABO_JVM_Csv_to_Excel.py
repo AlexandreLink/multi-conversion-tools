@@ -9,25 +9,67 @@ import re
 openai.api_key = os.getenv("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY")
 
 def filter_new_subscriptions(df):
-    """Filtrer les abonnements créés après le 5 du mois **localement (sans OpenAI)**."""
+    """Filtrer les abonnements créés après le 5 du mois en demandant à OpenAI."""
     if df.empty:
         return df, pd.DataFrame()
 
     today = datetime.today()
-    limit_date = datetime(today.year, today.month, 5)
+    start_date = datetime(today.year, today.month, 5).strftime('%Y-%m-%d')
 
-    # Assurer la conversion correcte des dates
-    df['Created at'] = pd.to_datetime(df['Created at'], errors='coerce')
+    # Construire un prompt ultra-simple en n'envoyant QUE `ID` et `Created at`
+    prompt = f"""
+    Tu es un assistant chargé de filtrer les abonnements.
+    Ta seule tâche est de **supprimer toutes les lignes où 'Created at' est postérieur au {start_date}.**
 
-    # Séparer les abonnements valides et ceux créés après le 5
-    valid_df = df[df['Created at'] < limit_date]
-    removed_df = df[df['Created at'] >= limit_date]
+    🔹 **Format de réponse attendu :**
+    - `KEEP: id1, id2, id3` (IDs à garder)
+    - `REMOVE: id4, id5, id6` (IDs à supprimer)
 
-    # Afficher les abonnements supprimés
+    **Exemple :**
+    ```
+    KEEP: 12345,67890,54321
+    REMOVE: 98765,56789,43210
+    ```
+
+    Voici les abonnements :
+    """
+
+    # **N'envoyer que l'ID et la date** pour réduire la taille des données
+    for _, row in df[['ID', 'Created at']].dropna().iterrows():
+        prompt += f"{row['ID']} | Created at: {row['Created at']}\n"
+
+    prompt += "\n🔹 Maintenant, donne-moi UNIQUEMENT la liste des IDs KEEP et REMOVE."
+
+    # **Envoyer à OpenAI**
+    client = openai.OpenAI(api_key=openai.api_key)
+    response = client.chat.completions.create(
+        model="gpt-4-turbo",
+        messages=[{"role": "system", "content": "Tu es un assistant de filtrage de données."},
+                  {"role": "user", "content": prompt}]
+    )
+
+    # **Afficher la réponse brute d'OpenAI**
+    st.write("🔍 **Réponse brute d'OpenAI (Filtrage 'Created at') :**", response)
+
+    # **Extraire les IDs avec une regex efficace**
+    output = response.choices[0].message.content.strip()
+
+    keep_match = re.search(r'KEEP: ([\d, ]+)', output)
+    remove_match = re.search(r'REMOVE: ([\d, ]+)', output)
+
+    selected_ids = [int(id_) for id_ in keep_match.group(1).split(',')] if keep_match else []
+    removed_ids = [int(id_) for id_ in remove_match.group(1).split(',')] if remove_match else []
+
+    # **Créer les DataFrames filtrés**
+    kept_df = df[df['ID'].isin(selected_ids)]
+    removed_df = df[df['ID'].isin(removed_ids)]
+
+    # **Afficher les abonnements supprimés**
     st.write(f"❌ **Abonnements supprimés (créés après le 5 du mois) : {len(removed_df)}**")
     st.dataframe(removed_df[['ID', 'Customer name', 'Created at']])
 
-    return valid_df, removed_df
+    return kept_df, removed_df
+
 
 def process_csv(uploaded_files):
     """Lire et traiter plusieurs fichiers CSV."""
@@ -37,37 +79,38 @@ def process_csv(uploaded_files):
         df = pd.read_csv(csv_file)
         all_dataframes.append(df)
 
-    # Fusionner les fichiers en un seul DataFrame
+    # **Fusionner les fichiers CSV**
     df = pd.concat(all_dataframes, ignore_index=True)
 
-    # Vérifier si la colonne 'Created at' existe
+    # **Vérifier la colonne 'Created at'**
     if 'Created at' not in df.columns:
         st.error("La colonne 'Created at' est introuvable dans les fichiers CSV.")
         return None, None
 
-    # 🎯 **Filtrer les abonnements créés après le 5 du mois (localement, sans OpenAI)**
+    # 🎯 **Filtrer les abonnements créés après le 5 du mois AVEC OpenAI**
     df, removed_df = filter_new_subscriptions(df)
 
-    # Vérification de la colonne 'Status'
+    # **Vérifier la colonne 'Status'**
     if 'Status' not in df.columns:
         st.error("La colonne 'Status' est introuvable dans les fichiers CSV.")
         return None, None
 
     df['Status'] = df['Status'].str.upper()
 
-    # Vérification de la colonne 'Next order date'
+    # **Vérifier la colonne 'Next order date'**
     if 'Next order date' not in df.columns:
         st.error("La colonne 'Next order date' est introuvable dans les fichiers CSV.")
         return None, None
 
-    # Séparer les abonnements actifs et annulés
+    # **Séparer les abonnements actifs et annulés**
     active_df = df[df['Status'] == 'ACTIVE']
     cancelled_df = df[df['Status'] == 'CANCELLED']
 
-    # Supprimer Brice N Guessan & Brice N'Guessan
+    # **Supprimer Brice N Guessan & Brice N'Guessan**
     cancelled_df = cancelled_df[~cancelled_df['Customer name'].str.contains(r"Brice N'?Guessan", case=False, na=False, regex=True)]
 
     return active_df, cancelled_df
+
 
 def ask_openai_for_filtering(cancelled_df):
     """Filtrer les abonnements annulés via OpenAI pour réintégrer ceux valides."""
