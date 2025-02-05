@@ -51,14 +51,11 @@ def ask_openai_for_filtering(cancelled_df):
     cancelled_df['Next order date'] = pd.to_datetime(cancelled_df['Next order date'], errors='coerce')
 
     # Afficher la liste des abonnements annulés envoyés à OpenAI
-    st.write("📝 **Liste des abonnements annulés envoyés à OpenAI (Extrait)**")
+    st.write(f"📝 **Liste des abonnements annulés envoyés à OpenAI : {len(cancelled_df)}**")
     st.dataframe(cancelled_df[['ID', 'Customer name', 'Next order date']])
 
     # Vérifier si la colonne "Cancellation note" existe
     if 'Cancellation note' in cancelled_df.columns:
-        # Afficher le nombre d'abonnements avant suppression
-        st.write(f"🔎 **Abonnements avant exclusion des remboursements : {len(cancelled_df)}**")
-
         # Filtrer pour supprimer les clients ayant "Remboursement" dans Cancellation note
         cancelled_df = cancelled_df[~cancelled_df['Cancellation note'].str.contains("Remboursement", case=False, na=False)]
 
