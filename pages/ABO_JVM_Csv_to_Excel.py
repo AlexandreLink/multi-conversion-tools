@@ -45,6 +45,25 @@ def process_csv(uploaded_files):
     df['Created at'] = df['Created at'].str.replace('T', ' ')  # Remplacer 'T' par un espace (format ISO)
     df['Created at'] = pd.to_datetime(df['Created at'], errors='coerce')  # Réessayer la conversion
 
+    invalid_dates_after_correction = df[df['Created at'].isna()][['ID', 'Created at']]
+    if not invalid_dates_after_correction.empty:
+        st.write("⚠️ **Valeurs toujours impossibles à convertir après correction :**")
+        st.dataframe(invalid_dates_after_correction)
+    else:
+        st.write("✅ **Toutes les valeurs 'Created at' ont été correctement converties !**")
+
+    # 🚀 Filtrage : Suppression des abonnements créés après le 5 du mois
+    today = datetime.today()
+    start_date = datetime(today.year, today.month, 5)
+
+    df_before_filtering = len(df)
+    df = df[df['Created at'] < start_date]
+    df_after_filtering = len(df)
+
+    st.write(f"🚀 **Avant le filtrage : {df_before_filtering} abonnements**")
+    st.write(f"✅ **Après le filtrage : {df_after_filtering} abonnements (supprimés : {df_before_filtering - df_after_filtering})**")    
+
+
     # 🎯 **Étape 5 : Vérifier après correction**
     invalid_dates_after_correction = df[df['Created at'].isna()][['ID', 'Created at']]
     if not invalid_dates_after_correction.empty:
