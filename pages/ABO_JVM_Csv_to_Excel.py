@@ -54,6 +54,19 @@ def ask_openai_for_filtering(cancelled_df):
     st.write("📝 **Liste des abonnements annulés envoyés à OpenAI (Extrait)**")
     st.dataframe(cancelled_df[['ID', 'Customer name', 'Next order date']])
 
+    # Vérifier si la colonne "Cancellation note" existe
+    if 'Cancellation note' in cancelled_df.columns:
+        # Afficher le nombre d'abonnements avant suppression
+        st.write(f"🔎 **Abonnements avant exclusion des remboursements : {len(cancelled_df)}**")
+
+        # Filtrer pour supprimer les clients ayant "Remboursement" dans Cancellation note
+        cancelled_df = cancelled_df[~cancelled_df['Cancellation note'].str.contains("Remboursement", case=False, na=False)]
+
+        # Afficher le nombre d'abonnements après suppression des remboursements
+        st.write(f"❌ **Abonnements après exclusion des remboursements : {len(cancelled_df)}**")
+    else:
+        st.write("⚠️ **La colonne 'Cancellation note' n'existe pas dans les fichiers fournis.**")
+
 
     # Supprimer les doublons basés sur le Customer name (conserver le premier)
     cancelled_df = cancelled_df.drop_duplicates(subset=['Customer name'], keep='first')
