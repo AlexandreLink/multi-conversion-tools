@@ -19,11 +19,33 @@ def process_csv(uploaded_files):
     # Fusionner tous les fichiers en un seul DataFrame
     df = pd.concat(all_dataframes, ignore_index=True)
 
-    # Vérification de la colonne 'Status'
+    # Vérifier si la colonne "Status" existe
     if 'Status' not in df.columns:
         st.error("La colonne 'Status' est introuvable dans les fichiers CSV.")
         return None, None
     df['Status'] = df['Status'].str.upper()
+
+    # Vérifier si la colonne "Created at" existe
+    if 'Created at' in df.columns:
+        st.write(f"📅 **Vérification des abonnements créés après le 5 du mois en cours...**")
+
+        # Conversion de "Created at" en datetime
+        df['Created at'] = pd.to_datetime(df['Created at'], errors='coerce')
+
+        # Déterminer la date limite (5 du mois en cours)
+        today = datetime.today()
+        limit_date = datetime(today.year, today.month, 5)
+
+        # Afficher le nombre total avant suppression
+        st.write(f"🔍 **Nombre total d'abonnements avant filtrage : {len(df)}**")
+
+        # Supprimer les abonnements créés après le 5 du mois
+        df = df[df['Created at'] < limit_date]
+
+        # Afficher le nombre après suppression
+        st.write(f"❌ **Abonnements après exclusion des créés après le 5 du mois : {len(df)}**")
+    else:
+        st.write("⚠️ **La colonne 'Created at' n'existe pas dans les fichiers fournis.**")
 
     # Vérification de la colonne 'Next order date'
     if 'Next order date' not in df.columns:
@@ -38,6 +60,7 @@ def process_csv(uploaded_files):
     cancelled_df = cancelled_df[~cancelled_df['Customer name'].str.contains(r"Brice N'?Guessan", case=False, na=False, regex=True)]
 
     return active_df, cancelled_df
+
 
 def ask_openai_for_filtering(cancelled_df):
     """Envoie les données des abonnements annulés à OpenAI et récupère la liste des ID à réintégrer."""
