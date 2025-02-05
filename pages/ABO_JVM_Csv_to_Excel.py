@@ -43,25 +43,29 @@ def process_csv(uploaded_files):
     # 🎯 **Étape 4 : Correction automatique des formats**
     df['Created at'] = df['Created at'].astype(str).str.strip()  # Supprimer les espaces
     df['Created at'] = df['Created at'].str.replace('T', ' ')  # Remplacer 'T' par un espace (format ISO)
-    df['Created at'] = pd.to_datetime(df['Created at'], errors='coerce')  # Réessayer la conversion
+    # Conversion de "Created at" en datetime
+    df['Created at'] = pd.to_datetime(df['Created at'], errors='coerce')
 
-    invalid_dates_after_correction = df[df['Created at'].isna()][['ID', 'Created at']]
-    if not invalid_dates_after_correction.empty:
-        st.write("⚠️ **Valeurs toujours impossibles à convertir après correction :**")
-        st.dataframe(invalid_dates_after_correction)
-    else:
-        st.write("✅ **Toutes les valeurs 'Created at' ont été correctement converties !**")
+    # Vérifier si certaines valeurs sont NaT après conversion
+    invalid_dates = df[df['Created at'].isna()]
+    if not invalid_dates.empty:
+        st.write("⚠️ **Certaines dates n'ont pas pu être converties en datetime :**")
+        st.dataframe(invalid_dates[['ID', 'Created at']])
+
+    # Normalisation des fuseaux horaires : Convertir toutes les dates en UTC
+    df['Created at'] = df['Created at'].dt.tz_convert(None)  # Supprime les informations de fuseau horaire
 
     # 🚀 Filtrage : Suppression des abonnements créés après le 5 du mois
     today = datetime.today()
-    start_date = datetime(today.year, today.month, 5)
+    start_date = datetime(today.year, today.month, 5)  # Cette date est sans fuseau horaire
 
     df_before_filtering = len(df)
-    df = df[df['Created at'] < start_date]
+    df = df[df['Created at'] < start_date]  # Comparaison entre dates maintenant uniformisées
     df_after_filtering = len(df)
 
     st.write(f"🚀 **Avant le filtrage : {df_before_filtering} abonnements**")
-    st.write(f"✅ **Après le filtrage : {df_after_filtering} abonnements (supprimés : {df_before_filtering - df_after_filtering})**")    
+    st.write(f"✅ **Après le filtrage : {df_after_filtering} abonnements (supprimés : {df_before_filtering - df_after_filtering})**")
+    
 
 
     # 🎯 **Étape 5 : Vérifier après correction**
