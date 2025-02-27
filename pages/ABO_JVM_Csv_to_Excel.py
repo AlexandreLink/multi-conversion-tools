@@ -129,6 +129,16 @@ def process_csv(uploaded_files, include_youtube=False):
     # Fusionner tous les fichiers en un seul DataFrame
     df = pd.concat(all_dataframes, ignore_index=True)
 
+    # Vérifier tous les statuts uniques présents
+    unique_statuses = df['Status'].unique()
+    st.write(f"📊 **Statuts d'abonnement trouvés :** {', '.join(unique_statuses)}")
+
+    # Compter les abonnements par statut
+    status_counts = df['Status'].value_counts()
+    st.write("📊 **Nombre d'abonnements par statut avant filtrage :**")
+    for status, count in status_counts.items():
+        st.write(f"- {status}: {count}")
+
     # Vérifier les colonnes requises
     required_columns = ['ID', 'Created at', 'Status', 'Next order date', 'Customer name']
     missing_columns = [col for col in required_columns if col not in df.columns]
@@ -173,9 +183,24 @@ def process_csv(uploaded_files, include_youtube=False):
     # Ajout de la colonne 'Source' pour Shopify
     df['Source'] = 'Shopify'
 
-    # Filtrage des abonnements actifs et annulés
+    # Filtrage des abonnements par statut
     active_df = df[df['Status'] == 'ACTIVE']
+    paused_df = df[df['Status'] == 'PAUSED']  # Stockage des abonnements en pause
     cancelled_df = df[df['Status'] == 'CANCELLED']
+    other_status_df = df[~df['Status'].isin(['ACTIVE', 'PAUSED', 'CANCELLED'])]  # Autres statuts éventuels
+
+    # Afficher le nombre d'abonnements par statut après filtrage
+    st.write("📊 **Détail des abonnements après filtrage :**")
+    st.write(f"- ACTIVE: {len(active_df)}")
+    st.write(f"- PAUSED: {len(paused_df)}")
+    st.write(f"- CANCELLED: {len(cancelled_df)}")
+    if len(other_status_df) > 0:
+        st.write(f"- Autres statuts: {len(other_status_df)}")
+
+    # Ajouter les abonnements en pause aux abonnements actifs
+    if len(paused_df) > 0:
+        active_df = pd.concat([active_df, paused_df], ignore_index=True)
+        st.success(f"✅ **{len(paused_df)} abonnements en pause ajoutés aux abonnements actifs**")
 
     # Supprimer les abonnements test (Brice N Guessan / Brice N'Guessan)
     pattern = r"Brice N'?Guessan"
