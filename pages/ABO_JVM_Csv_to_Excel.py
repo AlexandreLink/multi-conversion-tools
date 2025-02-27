@@ -183,29 +183,36 @@ def process_csv(uploaded_files, include_youtube=False):
     # Ajout de la colonne 'Source' pour Shopify
     df['Source'] = 'Shopify'
 
-    # Filtrage des abonnements par statut
+    # Séparation initiale des abonnements par statut
     active_df = df[df['Status'] == 'ACTIVE']
-    paused_df = df[df['Status'] == 'PAUSED']  # Stockage des abonnements en pause
+    paused_df = df[df['Status'] == 'PAUSED']
     cancelled_df = df[df['Status'] == 'CANCELLED']
-    other_status_df = df[~df['Status'].isin(['ACTIVE', 'PAUSED', 'CANCELLED'])]  # Autres statuts éventuels
 
-    # Afficher le nombre d'abonnements par statut après filtrage
-    st.write("📊 **Détail des abonnements après filtrage :**")
+    # Afficher le nombre d'abonnements par statut
+    st.write("📊 **Détail des abonnements par statut :**")
     st.write(f"- ACTIVE: {len(active_df)}")
     st.write(f"- PAUSED: {len(paused_df)}")
     st.write(f"- CANCELLED: {len(cancelled_df)}")
-    if len(other_status_df) > 0:
-        st.write(f"- Autres statuts: {len(other_status_df)}")
 
-    # Ne pas inclure les abonnements en pause dans les actifs
-    st.info(f"ℹ️ Les {len(paused_df)} abonnements en pause sont traités séparément des abonnements actifs")
+    # Filtrage spécifique pour les abonnements annulés
+    # Conversion de "Next order date" en datetime
+    cancelled_df['Next order date'] = pd.to_datetime(cancelled_df['Next order date'], errors='coerce')
+
+    # Déterminer le 5 du mois actuel
+    today = datetime.today()
+    cutoff_date = datetime(today.year, today.month, 5)
+
+    # Garder uniquement les abonnements annulés dont la prochaine commande est après le 5 du mois
+    valid_cancelled_df = cancelled_df[cancelled_df['Next order date'] > cutoff_date]
+
+    st.write(f"ℹ️ Sur {len(cancelled_df)} abonnements annulés, {len(valid_cancelled_df)} ont une date de commande après le 5 du mois et sont conservés")
 
     # Supprimer les abonnements test (Brice N Guessan / Brice N'Guessan)
     pattern = r"Brice N'?Guessan"
-    mask = cancelled_df['Customer name'].str.contains(pattern, case=False, na=False, regex=True)
+    mask = valid_cancelled_df['Customer name'].str.contains(pattern, case=False, na=False, regex=True)
     test_count = mask.sum()
     if test_count > 0:
-        cancelled_df = cancelled_df[~mask]
+        valid_cancelled_df = valid_cancelled_df[~mask]
         st.info(f"ℹ️ {test_count} abonnements de test ont été supprimés.")
 
     # Intégrer les abonnés YouTube si demandé
