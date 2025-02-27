@@ -197,10 +197,8 @@ def process_csv(uploaded_files, include_youtube=False):
     if len(other_status_df) > 0:
         st.write(f"- Autres statuts: {len(other_status_df)}")
 
-    # Ajouter les abonnements en pause aux abonnements actifs
-    if len(paused_df) > 0:
-        active_df = pd.concat([active_df, paused_df], ignore_index=True)
-        st.success(f"✅ **{len(paused_df)} abonnements en pause ajoutés aux abonnements actifs**")
+    # Ne pas inclure les abonnements en pause dans les actifs
+    st.info(f"ℹ️ Les {len(paused_df)} abonnements en pause sont traités séparément des abonnements actifs")
 
     # Supprimer les abonnements test (Brice N Guessan / Brice N'Guessan)
     pattern = r"Brice N'?Guessan"
