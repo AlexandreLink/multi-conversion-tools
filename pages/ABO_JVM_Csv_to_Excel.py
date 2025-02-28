@@ -74,13 +74,24 @@ def load_from_mongodb():
         # Récupération des utilisateurs
         users = list(collection.find({}, {
             "_id": 0,  # Exclusion de l'ID MongoDB
+            "customerID": 1,
+            "deliveryName": 1,
+            "deliveryAddress1": 1, 
+            "deliveryAddress2": 1,
+            "deliveryZip": 1,
+            "deliveryCity": 1,
+            "deliveryProvinceCode": 1,
+            "deliveryCountryCode": 1,
+            "billingCountry": 1,
+            "quantity": 1,
+            "discordId": 1,
+            "username": 1,
+            # Ces champs sont pour la rétrocompatibilité avec l'ancien format
             "name": 1,
             "address": 1,
             "city": 1,
             "postalCode": 1,
-            "country": 1,
-            "discordId": 1,
-            "username": 1
+            "country": 1
         }))
         
         if not users:
@@ -90,32 +101,55 @@ def load_from_mongodb():
         # Conversion en DataFrame pandas
         df_youtube = pd.DataFrame(users)
         
-        # Ajouter et renommer les colonnes pour correspondre au format attendu
-        df_youtube['ID'] = df_youtube['discordId']  # Utiliser discordId comme identifiant unique
-        df_youtube['Customer name'] = df_youtube['name']
-        df_youtube['Delivery address 1'] = df_youtube['address']
-        df_youtube['Delivery address 2'] = ""  # Colonne vide par défaut
-        df_youtube['Delivery city'] = df_youtube['city']
-        df_youtube['Delivery zip'] = df_youtube['postalCode']
-        df_youtube['Delivery country code'] = df_youtube.apply(
-            lambda row: "FR" if row.get('country', "").upper() == "FRANCE" else row.get('country', ""), 
-            axis=1
-        )
-        df_youtube['Delivery province code'] = ""  # Colonne vide par défaut
-        df_youtube['Billing country'] = df_youtube.apply(
-            lambda row: "FRANCE" if row.get('country', "").upper() == "FRANCE" else row.get('country', ""),
-            axis=1
-        )
-        df_youtube['Delivery interval count'] = 1  # Par défaut, 1 exemplaire par abonné
-        df_youtube['Status'] = 'ACTIVE'  # Tous les abonnés YouTube sont considérés comme actifs
-        df_youtube['Source'] = 'YouTube'  # Marquer la source
-        df_youtube['Created at'] = datetime.now()  # Date actuelle comme date de création
+        # Gestion de la rétrocompatibilité avec l'ancien format
+        # Ces lignes ne sont nécessaires que pendant la transition entre l'ancien et le nouveau format
+        if 'deliveryName' not in df_youtube.columns and 'name' in df_youtube.columns:
+            df_youtube['deliveryName'] = df_youtube['name']
+        if 'deliveryAddress1' not in df_youtube.columns and 'address' in df_youtube.columns:
+            df_youtube['deliveryAddress1'] = df_youtube['address']
+        if 'deliveryCity' not in df_youtube.columns and 'city' in df_youtube.columns:
+            df_youtube['deliveryCity'] = df_youtube['city']
+        if 'deliveryZip' not in df_youtube.columns and 'postalCode' in df_youtube.columns:
+            df_youtube['deliveryZip'] = df_youtube['postalCode']
+        if 'deliveryCountryCode' not in df_youtube.columns and 'country' in df_youtube.columns:
+            df_youtube['deliveryCountryCode'] = df_youtube.apply(
+                lambda row: "FR" if row.get('country', "").upper() in ["FRANCE", "FRANCIA", "FR"] else row.get('country', "")[:2].upper(), 
+                axis=1
+            )
+        if 'billingCountry' not in df_youtube.columns and 'country' in df_youtube.columns:
+            df_youtube['billingCountry'] = df_youtube['country']
+        if 'customerID' not in df_youtube.columns and 'discordId' in df_youtube.columns:
+            df_youtube['customerID'] = df_youtube['discordId']
+        if 'quantity' not in df_youtube.columns:
+            df_youtube['quantity'] = 1
+            
+        # Uniformiser les noms de colonnes pour le format final attendu par les transporteurs
+        # En mappant vers les noms exacts attendus dans prepare_final_files
+        column_mapping = {
+            "customerID": "ID",
+            "deliveryName": "Customer name",
+            "deliveryAddress1": "Delivery address 1",
+            "deliveryAddress2": "Delivery address 2",
+            "deliveryZip": "Delivery zip",
+            "deliveryCity": "Delivery city",
+            "deliveryProvinceCode": "Delivery province code",
+            "deliveryCountryCode": "Delivery country code",
+            "billingCountry": "Billing country",
+            "quantity": "Delivery interval count"
+        }
         
-        # Créer une colonne d'adresse complète pour affichage uniquement
-        df_youtube['Shipping address'] = df_youtube.apply(
-            lambda row: f"{row.get('address', '')}, {row.get('city', '')}, {row.get('postalCode', '')}, {row.get('country', '')}",
-            axis=1
-        )
+        # Renommer les colonnes pour correspondre au format attendu
+        df_youtube = df_youtube.rename(columns=column_mapping)
+        
+        # Ajouter les colonnes manquantes pour la compatibilité
+        for col in column_mapping.values():
+            if col not in df_youtube.columns:
+                df_youtube[col] = None
+        
+        # Ajouter la colonne Source pour distinguer ces entrées
+        df_youtube['Source'] = 'YouTube'
+        df_youtube['Status'] = 'ACTIVE'  # Tous les abonnés YouTube sont considérés comme actifs
+        df_youtube['Created at'] = datetime.now()  # Date actuelle comme date de création
         
         st.success(f"✅ **{len(df_youtube)} abonnés YouTube récupérés avec succès !**")
         return df_youtube
