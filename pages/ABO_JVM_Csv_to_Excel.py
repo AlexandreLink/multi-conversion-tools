@@ -333,16 +333,65 @@ if uploaded_files:
             # Par défaut, considérer comme étranger si on ne peut pas déterminer
             return False
 
+        # Fonction pour préparer le format final
+        def prepare_final_files(df):
+            """Prépare le fichier final avec les colonnes nécessaires et renommées."""
+            column_mapping = {
+                "ID": "Customer ID",
+                "Customer name": "Delivery name",
+                "Delivery address 1": "Delivery address 1",
+                "Delivery address 2": "Delivery address 2",
+                "Delivery zip": "Delivery zip",
+                "Delivery city": "Delivery city",
+                "Delivery province code": "Delivery province code",
+                "Delivery country code": "Delivery country code",
+                "Billing country": "Billing country",
+                "Delivery interval count": "Quantity"
+            }
+            
+            # S'assurer que toutes les colonnes nécessaires existent
+            for col in column_mapping.keys():
+                if col not in df.columns:
+                    df[col] = None  # Ajouter une colonne vide si elle n'existe pas
+            
+            # Sélectionner et renommer les colonnes
+            df = df[list(column_mapping.keys())].rename(columns=column_mapping)
+            
+            # Remplir la colonne Billing country pour la France si elle est vide
+            df['Billing country'] = df.apply(
+                lambda row: "FRANCE" if pd.isnull(row['Billing country']) and row['Delivery country code'] == "FR" else row['Billing country'],
+                axis=1
+            )
+            
+            final_columns = [
+                "Customer ID", "Delivery name", "Delivery address 1", "Delivery address 2",
+                "Delivery zip", "Delivery city", "Delivery province code",
+                "Delivery country code", "Billing country", "Quantity"
+            ]
+            return df[final_columns]
+
         # Créer les dataframes séparés pour France et Étranger
         if active_df is not None and cancelled_df is not None:
-            # Combiner actifs et annulés pour l'affichage des statistiques
+            # Combiner actifs et annulés
             all_df = pd.concat([active_df, cancelled_df], ignore_index=True)
+            
+            # Préparer le format final
+            all_df = prepare_final_files(all_df)
+            
+            # Séparer par pays
             france_df = all_df[all_df.apply(is_france, axis=1)]
             etranger_df = all_df[~all_df.apply(is_france, axis=1)]
             
             st.write(f"📊 **Répartition des abonnements :**")
             st.write(f"- France : {len(france_df)} abonnements")
             st.write(f"- Étranger : {len(etranger_df)} abonnements")
+            
+            # Afficher un aperçu
+            st.write(f"📌 **Aperçu des données finales pour la France :**")
+            st.dataframe(france_df.head(5))
+            
+            st.write(f"📌 **Aperçu des données finales pour l'étranger :**")
+            st.dataframe(etranger_df.head(5))
 
         # Colonnes d'export 
         col1, col2 = st.columns(2)
