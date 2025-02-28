@@ -315,31 +315,76 @@ if uploaded_files:
         
         # Option d'exportation
         st.write("## 💾 Exportation des données")
-        
-        if st.button("Exporter les fichiers CSV"):
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # Fonction pour déterminer si une adresse est en France
+        def is_france(row):
+            # Vérifier d'abord le pays de livraison s'il existe
+            if 'Delivery country code' in row and pd.notna(row['Delivery country code']):
+                return row['Delivery country code'].upper() == 'FR'
             
-            # Définir les noms de fichiers
-            active_filename = f"{file_prefix}_actifs_{timestamp}.csv" if file_prefix else f"actifs_{timestamp}.csv"
-            cancelled_filename = f"{file_prefix}_annules_{timestamp}.csv" if file_prefix else f"annules_{timestamp}.csv"
+            # Vérifier le pays de livraison s'il existe
+            if 'Delivery country' in row and pd.notna(row['Delivery country']):
+                return 'FRANCE' in row['Delivery country'].upper()
             
-            # Convertir les DataFrames en CSV
-            active_csv = active_df.to_csv(index=False)
-            cancelled_csv = cancelled_df.to_csv(index=False)
+            # Vérifier la méthode de livraison s'il existe
+            if 'Delivery Method' in row and pd.notna(row['Delivery Method']):
+                return 'FR' in row['Delivery Method'].upper()
             
-            # Proposer le téléchargement
-            st.download_button(
-                label="📥 Télécharger les abonnements actifs",
-                data=active_csv,
-                file_name=active_filename,
-                mime="text/csv"
-            )
+            # Par défaut, considérer comme étranger si on ne peut pas déterminer
+            return False
+
+        # Créer les dataframes séparés pour France et Étranger
+        if active_df is not None and cancelled_df is not None:
+            # Combiner actifs et annulés pour l'affichage des statistiques
+            all_df = pd.concat([active_df, cancelled_df], ignore_index=True)
+            france_df = all_df[all_df.apply(is_france, axis=1)]
+            etranger_df = all_df[~all_df.apply(is_france, axis=1)]
             
-            st.download_button(
-                label="📥 Télécharger les abonnements annulés",
-                data=cancelled_csv,
-                file_name=cancelled_filename,
-                mime="text/csv"
-            )
-            
-            st.success("✅ Fichiers prêts à être téléchargés !")
+            st.write(f"📊 **Répartition des abonnements :**")
+            st.write(f"- France : {len(france_df)} abonnements")
+            st.write(f"- Étranger : {len(etranger_df)} abonnements")
+
+        # Colonnes d'export 
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.write("### 🇫🇷 Abonnements France")
+            if st.button("Exporter le fichier France"):
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                
+                # Définir le nom du fichier
+                fr_filename = f"{file_prefix}_france_{timestamp}.csv" if file_prefix else f"france_{timestamp}.csv"
+                
+                # Convertir le DataFrame en CSV
+                fr_csv = france_df.to_csv(index=False)
+                
+                # Proposer le téléchargement
+                st.download_button(
+                    label="📥 Télécharger les abonnements France",
+                    data=fr_csv,
+                    file_name=fr_filename,
+                    mime="text/csv"
+                )
+                
+                st.success(f"✅ Fichier France prêt à être téléchargé ({len(france_df)} abonnements)")
+
+        with col2:
+            st.write("### 🌍 Abonnements Étranger")
+            if st.button("Exporter le fichier Étranger"):
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                
+                # Définir le nom du fichier
+                int_filename = f"{file_prefix}_etranger_{timestamp}.csv" if file_prefix else f"etranger_{timestamp}.csv"
+                
+                # Convertir le DataFrame en CSV
+                int_csv = etranger_df.to_csv(index=False)
+                
+                # Proposer le téléchargement
+                st.download_button(
+                    label="📥 Télécharger les abonnements Étranger",
+                    data=int_csv,
+                    file_name=int_filename,
+                    mime="text/csv"
+                )
+                
+                st.success(f"✅ Fichier Étranger prêt à être téléchargé ({len(etranger_df)} abonnements)")
