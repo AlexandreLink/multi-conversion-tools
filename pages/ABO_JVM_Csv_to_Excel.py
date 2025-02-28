@@ -201,9 +201,6 @@ def process_csv(uploaded_files, include_youtube=False):
     df = df[df['Created at'] < start_date]
     df_after_filtering = len(df)
 
-    df = df[df['Created at'] < start_date]  # Comparaison entre dates maintenant uniformisées
-    df_after_filtering = len(df)
-
     st.write(f"🚀 **Avant le filtrage : {df_before_filtering} abonnements**")
     st.write(f"✅ **Après le filtrage : {df_after_filtering} abonnements (supprimés : {df_before_filtering - df_after_filtering})**")
 
@@ -225,17 +222,10 @@ def process_csv(uploaded_files, include_youtube=False):
     st.write(f"- CANCELLED: {len(cancelled_df)}")
 
     # Filtrage spécifique pour les abonnements annulés
-    # Conversion de "Next order date" en datetime
-    cancelled_df['Next order date'] = pd.to_datetime(cancelled_df['Next order date'], errors='coerce')
+    valid_cancelled_df = cancelled_df.copy()
 
-    # Déterminer le 5 du mois actuel
-    today = datetime.today()
-    cutoff_date = datetime(today.year, today.month, 5)
-
-    # Garder uniquement les abonnements annulés dont la prochaine commande est après le 5 du mois
-    valid_cancelled_df = cancelled_df[cancelled_df['Next order date'] > cutoff_date]
-
-    st.write(f"ℹ️ Sur {len(cancelled_df)} abonnements annulés, {len(valid_cancelled_df)} ont une date de commande après le 5 du mois et sont conservés")
+    # Gardons tous les abonnements annulés pour l'instant
+    st.write(f"ℹ️ Utilisation de {len(valid_cancelled_df)} abonnements annulés sur {len(cancelled_df)} au total")
 
     # Supprimer les abonnements test (Brice N Guessan / Brice N'Guessan)
     pattern = r"Brice N'?Guessan"
@@ -261,7 +251,7 @@ def process_csv(uploaded_files, include_youtube=False):
             
             st.success(f"✅ **{len(youtube_df)} abonnés YouTube ajoutés aux abonnés actifs !**")
 
-    return active_df, cancelled_df
+    return active_df, valid_cancelled_df
 
 # Interface utilisateur Streamlit
 st.title("Gestion des abonnements JV Magazine")
