@@ -384,7 +384,7 @@ if uploaded_files:
         # Créer les dataframes séparés pour France et Étranger
         if active_df is not None and cancelled_df is not None:
             # Combiner actifs et annulés
-            all_df = pd.concat([active_df, cancelled_df], ignore_index=True)
+            all_df = pd.concat([active_df, valid_cancelled_df], ignore_index=True)
             
             # Préparer le format final
             all_df = prepare_final_files(all_df)
