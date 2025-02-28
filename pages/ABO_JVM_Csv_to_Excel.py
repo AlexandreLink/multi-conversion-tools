@@ -224,7 +224,12 @@ def process_csv(uploaded_files, include_youtube=False):
     # Filtrage spécifique pour les abonnements annulés
     # Conversion de "Next order date" en datetime avec gestion des erreurs
     try:
-        cancelled_df['Next order date'] = pd.to_datetime(cancelled_df['Next order date'], errors='coerce')
+        # Convertir la colonne Next order date sans fuseau horaire
+        cancelled_df['Next order date'] = pd.to_datetime(cancelled_df['Next order date'], errors='coerce', utc=True)
+        
+        # S'assurer que les dates n'ont pas de fuseau horaire
+        if cancelled_df['Next order date'].dt.tz is not None:
+            cancelled_df['Next order date'] = cancelled_df['Next order date'].dt.tz_localize(None)
         
         # Déterminer le 5 du mois actuel
         today = datetime.today()
@@ -232,14 +237,12 @@ def process_csv(uploaded_files, include_youtube=False):
         
         # Filtrer les abonnements annulés qui ont une date de prochaine commande après le 5 du mois
         # OU qui ont une date de prochaine commande nulle/invalide (les garder par précaution)
-        valid_next_order = cancelled_df['Next order date'] > cutoff_date
-        invalid_next_order = cancelled_df['Next order date'].isna()
-        valid_cancelled_df = cancelled_df[valid_next_order | invalid_next_order]
+        valid_cancelled_df = cancelled_df[cancelled_df['Next order date'] > cutoff_date]
         
         excluded_count = len(cancelled_df) - len(valid_cancelled_df)
         if excluded_count > 0:
             st.info(f"ℹ️ {excluded_count} abonnements annulés ont été exclus car leur prochaine date de commande est avant le 5 du mois.")
-    
+        
         st.write(f"ℹ️ Sur {len(cancelled_df)} abonnements annulés, {len(valid_cancelled_df)} ont une date de commande postérieure au 5 du mois et sont conservés.")
     except Exception as e:
         st.error(f"Erreur lors de l'analyse des dates de commande: {e}")
