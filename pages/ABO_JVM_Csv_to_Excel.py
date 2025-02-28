@@ -71,7 +71,7 @@ def load_from_mongodb():
         db = client.get_database()
         collection = db.users  # Assurez-vous que c'est le bon nom de collection
         
-        # Récupération des utilisateurs
+        # Récupération des utilisateurs avec uniquement les nouveaux champs
         users = list(collection.find({}, {
             "_id": 0,  # Exclusion de l'ID MongoDB
             "customerID": 1,
@@ -85,13 +85,7 @@ def load_from_mongodb():
             "billingCountry": 1,
             "quantity": 1,
             "discordId": 1,
-            "username": 1,
-            # Ces champs sont pour la rétrocompatibilité avec l'ancien format
-            "name": 1,
-            "address": 1,
-            "city": 1,
-            "postalCode": 1,
-            "country": 1
+            "username": 1
         }))
         
         if not users:
@@ -100,31 +94,8 @@ def load_from_mongodb():
         
         # Conversion en DataFrame pandas
         df_youtube = pd.DataFrame(users)
-        
-        # Gestion de la rétrocompatibilité avec l'ancien format
-        # Ces lignes ne sont nécessaires que pendant la transition entre l'ancien et le nouveau format
-        if 'deliveryName' not in df_youtube.columns and 'name' in df_youtube.columns:
-            df_youtube['deliveryName'] = df_youtube['name']
-        if 'deliveryAddress1' not in df_youtube.columns and 'address' in df_youtube.columns:
-            df_youtube['deliveryAddress1'] = df_youtube['address']
-        if 'deliveryCity' not in df_youtube.columns and 'city' in df_youtube.columns:
-            df_youtube['deliveryCity'] = df_youtube['city']
-        if 'deliveryZip' not in df_youtube.columns and 'postalCode' in df_youtube.columns:
-            df_youtube['deliveryZip'] = df_youtube['postalCode']
-        if 'deliveryCountryCode' not in df_youtube.columns and 'country' in df_youtube.columns:
-            df_youtube['deliveryCountryCode'] = df_youtube.apply(
-                lambda row: "FR" if row.get('country', "").upper() in ["FRANCE", "FRANCIA", "FR"] else row.get('country', "")[:2].upper(), 
-                axis=1
-            )
-        if 'billingCountry' not in df_youtube.columns and 'country' in df_youtube.columns:
-            df_youtube['billingCountry'] = df_youtube['country']
-        if 'customerID' not in df_youtube.columns and 'discordId' in df_youtube.columns:
-            df_youtube['customerID'] = df_youtube['discordId']
-        if 'quantity' not in df_youtube.columns:
-            df_youtube['quantity'] = 1
             
         # Uniformiser les noms de colonnes pour le format final attendu par les transporteurs
-        # En mappant vers les noms exacts attendus dans prepare_final_files
         column_mapping = {
             "customerID": "ID",
             "deliveryName": "Customer name",
@@ -308,19 +279,11 @@ def process_csv(uploaded_files, include_youtube=False):
     if include_youtube:
         youtube_df = load_from_mongodb()
         if not youtube_df.empty:
-            # Sélectionner uniquement les colonnes nécessaires pour la fusion
-            youtube_columns = [
-                'ID', 'Customer name', 'Shipping address', 'Status', 
-                'Created at', 'Source'
-            ]
-            youtube_df_filtered = youtube_df[youtube_columns]
-            
             # Ajouter les abonnés YouTube aux abonnés actifs
-            active_df = pd.concat([active_df, youtube_df_filtered], ignore_index=True)
+            active_df = pd.concat([active_df, youtube_df], ignore_index=True)
             
             st.success(f"✅ **{len(youtube_df)} abonnés YouTube ajoutés aux abonnés actifs !**")
-
-    return active_df, valid_cancelled_df
+        return active_df, valid_cancelled_df
 
 # Interface utilisateur Streamlit
 st.title("Gestion des abonnements JV Magazine")
