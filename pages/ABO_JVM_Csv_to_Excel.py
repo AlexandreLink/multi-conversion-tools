@@ -90,14 +90,28 @@ def load_from_mongodb():
         # Conversion en DataFrame pandas
         df_youtube = pd.DataFrame(users)
         
-        # Ajouter des colonnes pour harmoniser avec le format des abonnements Shopify
-        df_youtube['Status'] = 'ACTIVE'  # Tous les abonnés YouTube sont considérés comme actifs
-        df_youtube['Source'] = 'YouTube'  # Marquer la source
+        # Ajouter et renommer les colonnes pour correspondre au format attendu
         df_youtube['ID'] = df_youtube['discordId']  # Utiliser discordId comme identifiant unique
         df_youtube['Customer name'] = df_youtube['name']
+        df_youtube['Delivery address 1'] = df_youtube['address']
+        df_youtube['Delivery address 2'] = ""  # Colonne vide par défaut
+        df_youtube['Delivery city'] = df_youtube['city']
+        df_youtube['Delivery zip'] = df_youtube['postalCode']
+        df_youtube['Delivery country code'] = df_youtube.apply(
+            lambda row: "FR" if row.get('country', "").upper() == "FRANCE" else row.get('country', ""), 
+            axis=1
+        )
+        df_youtube['Delivery province code'] = ""  # Colonne vide par défaut
+        df_youtube['Billing country'] = df_youtube.apply(
+            lambda row: "FRANCE" if row.get('country', "").upper() == "FRANCE" else row.get('country', ""),
+            axis=1
+        )
+        df_youtube['Delivery interval count'] = 1  # Par défaut, 1 exemplaire par abonné
+        df_youtube['Status'] = 'ACTIVE'  # Tous les abonnés YouTube sont considérés comme actifs
+        df_youtube['Source'] = 'YouTube'  # Marquer la source
         df_youtube['Created at'] = datetime.now()  # Date actuelle comme date de création
         
-        # Créer une colonne d'adresse complète
+        # Créer une colonne d'adresse complète pour affichage uniquement
         df_youtube['Shipping address'] = df_youtube.apply(
             lambda row: f"{row.get('address', '')}, {row.get('city', '')}, {row.get('postalCode', '')}, {row.get('country', '')}",
             axis=1
