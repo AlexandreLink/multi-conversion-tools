@@ -398,11 +398,11 @@ if uploaded_files:
             st.write(f"- Étranger : {len(etranger_df)} abonnements")
             
             # Afficher un aperçu
-            st.write(f"📌 **Aperçu des données finales pour la France :**")
-            st.dataframe(france_df.head(5))
-            
-            st.write(f"📌 **Aperçu des données finales pour l'étranger :**")
-            st.dataframe(etranger_df.head(5))
+            st.write(f"📌 **Données finales pour la France :**")
+            st.dataframe(france_df)
+
+            st.write(f"📌 **Données finales pour l'étranger :**")
+            st.dataframe(etranger_df)
 
         # Colonnes d'export 
         col1, col2 = st.columns(2)
