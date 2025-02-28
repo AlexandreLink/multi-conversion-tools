@@ -171,6 +171,36 @@ def process_csv(uploaded_files, include_youtube=False):
     start_date = datetime(today.year, today.month, 5)
 
     df_before_filtering = len(df)
+
+    # Ajoutez ce code pour capturer les abonnements qui vont être supprimés
+    df_to_be_removed = df[df['Created at'] >= start_date].copy()
+    st.write(f"🔍 **Analyse des {len(df_to_be_removed)} abonnements qui seront supprimés :**")
+
+    # Afficher un échantillon de ces abonnements pour analyse
+    if not df_to_be_removed.empty:
+        # Afficher les statistiques sur les statuts
+        status_counts = df_to_be_removed['Status'].value_counts()
+        st.write("Répartition par statut :")
+        for status, count in status_counts.items():
+            st.write(f"- {status}: {count}")
+        
+        # Afficher les premières lignes pour inspection
+        st.write("Échantillon des abonnements supprimés :")
+        st.dataframe(df_to_be_removed[['ID', 'Status', 'Created at', 'Customer name']].head(10))
+        
+        # Option pour télécharger le fichier complet des supprimés
+        removed_csv = df_to_be_removed.to_csv(index=False)
+        st.download_button(
+            label="📥 Télécharger la liste des abonnements supprimés",
+            data=removed_csv,
+            file_name="abonnements_supprimes.csv",
+            mime="text/csv"
+        )
+
+    # Continuer avec le filtrage normal
+    df = df[df['Created at'] < start_date]
+    df_after_filtering = len(df)
+
     df = df[df['Created at'] < start_date]  # Comparaison entre dates maintenant uniformisées
     df_after_filtering = len(df)
 
