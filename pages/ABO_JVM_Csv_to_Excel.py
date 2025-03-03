@@ -305,7 +305,22 @@ def process_csv(uploaded_files, include_youtube=False):
     st.write(f"- CANCELLED: {len(cancelled_df)}")
 
     # Filtrage spécifique pour les abonnements annulés
-    # Conversion de "Next order date" en datetime avec gestion des erreurs
+    # D'abord, exclure les abonnements remboursés
+    if 'Cancellation note' in cancelled_df.columns:
+        # Compter les abonnements remboursés
+        refund_mask = cancelled_df['Cancellation note'].str.contains('Remboursement', case=False, na=False)
+        refund_count = refund_mask.sum()
+        
+        if refund_count > 0:
+            # Afficher les abonnements remboursés qui seront exclus
+            st.write(f"🔍 **Exclusion de {refund_count} abonnements annulés avec mention 'Remboursement' :**")
+            st.dataframe(cancelled_df[refund_mask][['ID', 'Customer name', 'Cancellation note']].head(10))
+            
+            # Filtrer pour ne garder que les abonnements non remboursés
+            cancelled_df = cancelled_df[~refund_mask]
+            st.info(f"ℹ️ {refund_count} abonnements remboursés ont été exclus.")
+    
+    # Ensuite, continuer avec le filtrage par date
     try:
         # Convertir la colonne Next order date sans fuseau horaire
         cancelled_df['Next order date'] = pd.to_datetime(cancelled_df['Next order date'], errors='coerce', utc=True)
