@@ -139,7 +139,7 @@ def load_from_mongodb():
         df_youtube['Status'] = 'ACTIVE'  # Tous les abonnés YouTube sont considérés comme actifs
         df_youtube['Created at'] = datetime.now()  # Date actuelle comme date de création
         
-        st.success(f"✅ **{len(df_youtube)} abonnés YouTube récupérés avec succès !**")        
+        st.success(f"✅ **{len(df_youtube)} abonnés YouTube récupérés avec succès !**")
         return df_youtube
         
     except Exception as e:
@@ -266,12 +266,6 @@ def process_csv(uploaded_files, include_youtube=False):
     # Vérifier à nouveau pour les entrées de test à chaque étape
     active_df = remove_test_entries(active_df)
     cancelled_df = remove_test_entries(cancelled_df)
-
-    # Afficher le nombre d'abonnements par statut
-    st.write("📊 **Détail des abonnements par statut :**")
-    st.write(f"- ACTIVE: {len(active_df)}")
-    st.write(f"- PAUSED: {len(paused_df)}")
-    st.write(f"- CANCELLED: {len(cancelled_df)}")
 
     # Filtrage spécifique pour les abonnements annulés
     # D'abord, exclure les abonnements remboursés
