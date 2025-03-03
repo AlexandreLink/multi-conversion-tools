@@ -94,6 +94,24 @@ def load_from_mongodb():
         
         # Conversion en DataFrame pandas
         df_youtube = pd.DataFrame(users)
+        
+        # Filtrer les entrées de test Brice N Guessan dès le chargement
+        if 'deliveryName' in df_youtube.columns:
+            name_pattern = r"Brice N'?Guessan"
+            name_mask = df_youtube['deliveryName'].str.contains(name_pattern, case=False, na=False, regex=True)
+            
+            # Vérification pour l'email si présent
+            email_mask = pd.Series(False, index=df_youtube.index)
+            if 'username' in df_youtube.columns:
+                email_mask = df_youtube['username'].str.contains('bnguessan@linkdigitalspirit.com', case=False, na=False)
+            
+            # Combiner les masques
+            test_mask = name_mask | email_mask
+            test_count = test_mask.sum()
+            
+            if test_count > 0:
+                st.warning(f"⚠️ Suppression de {test_count} entrées de test (Brice N Guessan) des données YouTube.")
+                df_youtube = df_youtube[~test_mask]
             
         # Uniformiser les noms de colonnes pour le format final attendu par les transporteurs
         column_mapping = {
@@ -129,6 +147,43 @@ def load_from_mongodb():
         st.error(f"Erreur lors de la connexion à MongoDB: {e}")
         return pd.DataFrame()
 
+# Fonction dédiée à la suppression des entrées de test
+def remove_test_entries(df):
+    """Supprime toutes les entrées liées à Brice N Guessan et son email"""
+    if df.empty:
+        return df
+    
+    initial_count = len(df)
+    
+    # Pattern pour le nom
+    name_pattern = r"Brice N'?Guessan"
+    name_mask = df['Customer name'].str.contains(name_pattern, case=False, na=False, regex=True)
+    
+    # Pattern pour l'email - vérifier si la colonne existe
+    email_mask = pd.Series(False, index=df.index)
+    email_columns = ['Email', 'Customer email', 'email']
+    for email_col in email_columns:
+        if email_col in df.columns:
+            col_mask = df[email_col].str.contains('bnguessan@linkdigitalspirit.com', case=False, na=False)
+            email_mask = email_mask | col_mask
+    
+    # Combiner les masques
+    test_mask = name_mask | email_mask
+    test_count = test_mask.sum()
+    
+    if test_count > 0:
+        # Pour le débogage: afficher des exemples d'entrées qui seront supprimées
+        st.write(f"🔍 **Suppression de {test_count} entrées de test détectées:**")
+        preview_cols = ['ID', 'Customer name']
+        preview_cols.extend([col for col in email_columns if col in df.columns])
+        st.dataframe(df[test_mask][preview_cols].head())
+        
+        # Supprimer les entrées de test
+        df = df[~test_mask]
+        st.info(f"ℹ️ {test_count} entrées de test ont été supprimées.")
+    
+    return df
+
 def process_csv(uploaded_files, include_youtube=False):
     """Lit et traite plusieurs fichiers CSV, avec option d'inclure les abonnés YouTube."""
     all_dataframes = []
@@ -137,6 +192,11 @@ def process_csv(uploaded_files, include_youtube=False):
         try:
             df = pd.read_csv(csv_file)
             st.write(f"✅ Fichier {csv_file.name} chargé : {len(df)} lignes")
+            
+            # Supprimer les entrées de test immédiatement après le chargement
+            df = remove_test_entries(df)
+            st.write(f"✅ Après suppression des entrées de test: {len(df)} lignes")
+            
             all_dataframes.append(df)
         except Exception as e:
             st.error(f"❌ Erreur lors du chargement de {csv_file.name}: {e}")
@@ -147,19 +207,6 @@ def process_csv(uploaded_files, include_youtube=False):
 
     # Fusionner tous les fichiers en un seul DataFrame
     df = pd.concat(all_dataframes, ignore_index=True)
-
-    # Supprimer tous les abonnements test (Brice N Guessan) dès le début
-    pattern = r"Brice N'?Guessan"
-    mask = df['Customer name'].str.contains(pattern, case=False, na=False, regex=True)
-    test_count = mask.sum()
-    st.write(f"DEBUG: Nombre d'abonnements 'Brice N Guessan' trouvés: {test_count}")
-    if test_count > 0:
-        # Debug: afficher ces lignes pour vérifier la correspondance
-        st.write("DEBUG: Exemples d'abonnements 'Brice N Guessan' détectés:")
-        st.dataframe(df[mask][['ID', 'Customer name']].head())
-    
-    df = df[~mask]
-    st.info(f"ℹ️ {test_count} abonnements de test ont été supprimés au début du traitement.")
 
     # Vérifier tous les statuts uniques présents
     unique_statuses = df['Status'].unique()
@@ -247,6 +294,10 @@ def process_csv(uploaded_files, include_youtube=False):
     paused_df = df[df['Status'] == 'PAUSED']
     cancelled_df = df[df['Status'] == 'CANCELLED']
 
+    # Vérifier à nouveau pour les entrées de test à chaque étape
+    active_df = remove_test_entries(active_df)
+    cancelled_df = remove_test_entries(cancelled_df)
+
     # Afficher le nombre d'abonnements par statut
     st.write("📊 **Détail des abonnements par statut :**")
     st.write(f"- ACTIVE: {len(active_df)}")
@@ -280,13 +331,8 @@ def process_csv(uploaded_files, include_youtube=False):
         st.error(f"Erreur lors de l'analyse des dates de commande: {e}")
         valid_cancelled_df = cancelled_df.copy()  # En cas d'erreur, garder tous les abonnements annulés par précaution
     
-    # Supprimer les abonnements test (Brice N Guessan / Brice N'Guessan)
-    pattern = r"Brice N'?Guessan"
-    mask = valid_cancelled_df['Customer name'].str.contains(pattern, case=False, na=False, regex=True)
-    test_count = mask.sum()
-    if test_count > 0:
-        valid_cancelled_df = valid_cancelled_df[~mask]
-        st.info(f"ℹ️ {test_count} abonnements de test ont été supprimés.")
+    # Vérifier à nouveau pour les entrées de test dans les cancelled valides
+    valid_cancelled_df = remove_test_entries(valid_cancelled_df)
 
     # Intégrer les abonnés YouTube si demandé
     if include_youtube:
@@ -295,7 +341,11 @@ def process_csv(uploaded_files, include_youtube=False):
             # Ajouter les abonnés YouTube aux abonnés actifs
             active_df = pd.concat([active_df, youtube_df], ignore_index=True)
             
+            # Vérifier une dernière fois après la fusion
+            active_df = remove_test_entries(active_df)
+            
             st.success(f"✅ **{len(youtube_df)} abonnés YouTube ajoutés aux abonnés actifs !**")
+    
     return active_df, valid_cancelled_df
 
 # Interface utilisateur Streamlit
@@ -403,12 +453,15 @@ if uploaded_files:
             # Combiner actifs et annulés
             all_df = pd.concat([active_df, valid_cancelled_df], ignore_index=True)
             
+            # Vérification finale pour les entrées de test
+            all_df = remove_test_entries(all_df)
+            
             # Préparer le format final
             all_df = prepare_final_files(all_df)
 
-            # Vérifier si des 'Brice N Guessan' sont encore présents
-            pattern = r"Brice N'?Guessan"
-            mask = all_df['Delivery name'].str.contains(pattern, case=False, na=False, regex=True)
+            # Vérification ultime des entrées de test
+            name_pattern = r"Brice N'?Guessan"
+            mask = all_df['Delivery name'].str.contains(name_pattern, case=False, na=False, regex=True)
             test_count = mask.sum()
             if test_count > 0:
                 st.warning(f"⚠️ {test_count} abonnements 'Brice N Guessan' ont été détectés après la préparation des données finales!")
@@ -416,7 +469,6 @@ if uploaded_files:
                 # Les supprimer
                 all_df = all_df[~mask]
                 st.info(f"ℹ️ {test_count} abonnements de test 'Brice N Guessan' supprimés des données finales.")
-
             
             # Séparer par pays
             france_df = all_df[all_df.apply(is_france, axis=1)]
