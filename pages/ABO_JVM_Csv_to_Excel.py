@@ -202,12 +202,6 @@ def process_csv(uploaded_files, include_youtube=False):
 
     # Vérifier tous les statuts uniques présents
     unique_statuses = df['Status'].unique()
-    
-    # Compter les abonnements par statut
-    status_counts = df['Status'].value_counts()
-    st.write("📊 **Nombre d'abonnements par statut avant filtrage :**")
-    for status, count in status_counts.items():
-        st.write(f"- {status}: {count}")
 
     # Vérifier les colonnes requises
     required_columns = ['ID', 'Created at', 'Status', 'Next order date', 'Customer name']
