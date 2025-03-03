@@ -148,6 +148,14 @@ def process_csv(uploaded_files, include_youtube=False):
     # Fusionner tous les fichiers en un seul DataFrame
     df = pd.concat(all_dataframes, ignore_index=True)
 
+    # Supprimer tous les abonnements test (Brice N Guessan) dès le début
+    pattern = r"Brice N'?Guessan"
+    mask = df['Customer name'].str.contains(pattern, case=False, na=False, regex=True)
+    test_count = mask.sum()
+    if test_count > 0:
+        df = df[~mask]
+        st.info(f"ℹ️ {test_count} abonnements de test ont été supprimés.")
+
     # Vérifier tous les statuts uniques présents
     unique_statuses = df['Status'].unique()
     st.write(f"📊 **Statuts d'abonnement trouvés :** {', '.join(unique_statuses)}")
