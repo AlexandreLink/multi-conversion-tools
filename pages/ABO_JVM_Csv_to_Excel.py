@@ -244,7 +244,7 @@ def process_csv(uploaded_files, include_youtube=False):
     df = df[df['Created at'] < start_date]
     df_after_filtering = len(df)
 
-    st.write(f"✅ **Abonnements après filtrage : {df_after_filtering} (supprimés : {df_before_filtering - df_after_filtering})**")
+    st.write(f"✅ **Abonnements après filtrage : {df_after_filtering} (Nombres d'abonnements crées après le 5 du mois : {df_before_filtering - df_after_filtering})**")
 
     # Standardisation de la colonne 'Status'
     df['Status'] = df['Status'].str.upper()
