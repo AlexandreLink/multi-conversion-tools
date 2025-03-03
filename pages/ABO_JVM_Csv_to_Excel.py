@@ -152,9 +152,14 @@ def process_csv(uploaded_files, include_youtube=False):
     pattern = r"Brice N'?Guessan"
     mask = df['Customer name'].str.contains(pattern, case=False, na=False, regex=True)
     test_count = mask.sum()
+    st.write(f"DEBUG: Nombre d'abonnements 'Brice N Guessan' trouvés: {test_count}")
     if test_count > 0:
-        df = df[~mask]
-        st.info(f"ℹ️ {test_count} abonnements de test ont été supprimés.")
+        # Debug: afficher ces lignes pour vérifier la correspondance
+        st.write("DEBUG: Exemples d'abonnements 'Brice N Guessan' détectés:")
+        st.dataframe(df[mask][['ID', 'Customer name']].head())
+    
+    df = df[~mask]
+    st.info(f"ℹ️ {test_count} abonnements de test ont été supprimés au début du traitement.")
 
     # Vérifier tous les statuts uniques présents
     unique_statuses = df['Status'].unique()
@@ -400,6 +405,18 @@ if uploaded_files:
             
             # Préparer le format final
             all_df = prepare_final_files(all_df)
+
+            # Vérifier si des 'Brice N Guessan' sont encore présents
+            pattern = r"Brice N'?Guessan"
+            mask = all_df['Delivery name'].str.contains(pattern, case=False, na=False, regex=True)
+            test_count = mask.sum()
+            if test_count > 0:
+                st.warning(f"⚠️ {test_count} abonnements 'Brice N Guessan' ont été détectés après la préparation des données finales!")
+                st.dataframe(all_df[mask][['Customer ID', 'Delivery name']].head())
+                # Les supprimer
+                all_df = all_df[~mask]
+                st.info(f"ℹ️ {test_count} abonnements de test 'Brice N Guessan' supprimés des données finales.")
+
             
             # Séparer par pays
             france_df = all_df[all_df.apply(is_france, axis=1)]
