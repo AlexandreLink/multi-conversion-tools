@@ -283,7 +283,7 @@ def process_csv(uploaded_files, include_youtube=False):
             active_df = pd.concat([active_df, youtube_df], ignore_index=True)
             
             st.success(f"✅ **{len(youtube_df)} abonnés YouTube ajoutés aux abonnés actifs !**")
-        return active_df, valid_cancelled_df
+    return active_df, valid_cancelled_df
 
 # Interface utilisateur Streamlit
 st.title("Gestion des abonnements JV Magazine")
@@ -383,6 +383,10 @@ if uploaded_files:
 
         # Créer les dataframes séparés pour France et Étranger
         if active_df is not None and cancelled_df is not None:
+            # S'assurer que valid_cancelled_df existe
+            if 'valid_cancelled_df' not in locals() and 'valid_cancelled_df' not in globals():
+                valid_cancelled_df = cancelled_df
+    
             # Combiner actifs et annulés
             all_df = pd.concat([active_df, valid_cancelled_df], ignore_index=True)
             
