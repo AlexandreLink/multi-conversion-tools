@@ -37,7 +37,6 @@ def robust_date_conversion(date_series):
     mask = result.isna()
     if mask.any():
         problematic_dates = cleaned_dates[mask]
-        st.write("⚠️ **Formats de dates problématiques détectés :**", problematic_dates.unique())
         
         # Essayer chaque format pour les dates problématiques
         for date_format in date_formats:
@@ -140,7 +139,7 @@ def load_from_mongodb():
         df_youtube['Status'] = 'ACTIVE'  # Tous les abonnés YouTube sont considérés comme actifs
         df_youtube['Created at'] = datetime.now()  # Date actuelle comme date de création
         
-        st.success(f"✅ **{len(df_youtube)} abonnés YouTube récupérés avec succès !**")
+        st.success(f"✅ **{len(df_youtube)} abonnés YouTube récupérés avec succès !**")        
         return df_youtube
         
     except Exception as e:
@@ -172,13 +171,7 @@ def remove_test_entries(df):
     test_count = test_mask.sum()
     
     if test_count > 0:
-        # Pour le débogage: afficher des exemples d'entrées qui seront supprimées
-        st.write(f"🔍 **Suppression de {test_count} entrées de test détectées:**")
-        preview_cols = ['ID', 'Customer name']
-        preview_cols.extend([col for col in email_columns if col in df.columns])
-        st.dataframe(df[test_mask][preview_cols].head())
-        
-        # Supprimer les entrées de test
+        # Supprimer les entrées de test sans afficher de détails
         df = df[~test_mask]
         st.info(f"ℹ️ {test_count} entrées de test ont été supprimées.")
     
@@ -195,7 +188,6 @@ def process_csv(uploaded_files, include_youtube=False):
             
             # Supprimer les entrées de test immédiatement après le chargement
             df = remove_test_entries(df)
-            st.write(f"✅ Après suppression des entrées de test: {len(df)} lignes")
             
             all_dataframes.append(df)
         except Exception as e:
@@ -210,8 +202,7 @@ def process_csv(uploaded_files, include_youtube=False):
 
     # Vérifier tous les statuts uniques présents
     unique_statuses = df['Status'].unique()
-    st.write(f"📊 **Statuts d'abonnement trouvés :** {', '.join(unique_statuses)}")
-
+    
     # Compter les abonnements par statut
     status_counts = df['Status'].value_counts()
     st.write("📊 **Nombre d'abonnements par statut avant filtrage :**")
@@ -224,13 +215,6 @@ def process_csv(uploaded_files, include_youtube=False):
     if missing_columns:
         st.error(f"Colonnes manquantes dans les fichiers CSV: {', '.join(missing_columns)}")
         return None, None
-
-    # 🔍 Afficher un aperçu des données brutes
-    st.write("🔍 **Aperçu des données brutes :**")
-    st.dataframe(df.head(5))
-
-    # 🧹 Nettoyage et conversion des dates
-    st.write("🧹 **Nettoyage et conversion des dates...**")
     
     # Utiliser notre fonction robuste de conversion de dates
     original_count = len(df)
@@ -241,47 +225,32 @@ def process_csv(uploaded_files, include_youtube=False):
     if len(df) < original_count:
         st.warning(f"⚠️ {original_count - len(df)} lignes avec des dates invalides ont été supprimées.")
 
-    # 🔎 Afficher un aperçu après conversion
-    st.write("🔎 **Aperçu après conversion des dates :**")
-    st.dataframe(df[['ID', 'Created at']].head(5))
-
     # 🚀 Filtrage : Suppression des abonnements créés après le 5 du mois
     today = datetime.today()
     start_date = datetime(today.year, today.month, 5)
 
     df_before_filtering = len(df)
 
-    # Ajoutez ce code pour capturer les abonnements qui vont être supprimés
+    # Calculer quels abonnements seront supprimés sans les afficher
     df_to_be_removed = df[df['Created at'] >= start_date].copy()
-    st.write(f"🔍 **Analyse des {len(df_to_be_removed)} abonnements qui seront supprimés :**")
+    removed_count = len(df_to_be_removed)
 
-    # Afficher un échantillon de ces abonnements pour analyse
+    # Créer le bouton de téléchargement pour les abonnements supprimés si nécessaire
     if not df_to_be_removed.empty:
-        # Afficher les statistiques sur les statuts
-        status_counts = df_to_be_removed['Status'].value_counts()
-        st.write("Répartition par statut :")
-        for status, count in status_counts.items():
-            st.write(f"- {status}: {count}")
-        
-        # Afficher les premières lignes pour inspection
-        st.write("Échantillon des abonnements supprimés :")
-        st.dataframe(df_to_be_removed[['ID', 'Status', 'Created at', 'Customer name']].head(10))
-        
-        # Option pour télécharger le fichier complet des supprimés
         removed_csv = df_to_be_removed.to_csv(index=False)
         st.download_button(
             label="📥 Télécharger la liste des abonnements supprimés",
             data=removed_csv,
             file_name="abonnements_supprimes.csv",
-            mime="text/csv"
+            mime="text/csv",
+            help="Télécharger la liste des abonnements créés après le 5 du mois"
         )
 
     # Continuer avec le filtrage normal
     df = df[df['Created at'] < start_date]
     df_after_filtering = len(df)
 
-    st.write(f"🚀 **Avant le filtrage : {df_before_filtering} abonnements**")
-    st.write(f"✅ **Après le filtrage : {df_after_filtering} abonnements (supprimés : {df_before_filtering - df_after_filtering})**")
+    st.write(f"✅ **Abonnements après filtrage : {df_after_filtering} (supprimés : {df_before_filtering - df_after_filtering})**")
 
     # Standardisation de la colonne 'Status'
     df['Status'] = df['Status'].str.upper()
@@ -312,10 +281,6 @@ def process_csv(uploaded_files, include_youtube=False):
         refund_count = refund_mask.sum()
         
         if refund_count > 0:
-            # Afficher les abonnements remboursés qui seront exclus
-            st.write(f"🔍 **Exclusion de {refund_count} abonnements annulés avec mention 'Remboursement' :**")
-            st.dataframe(cancelled_df[refund_mask][['ID', 'Customer name', 'Cancellation note']].head(10))
-            
             # Filtrer pour ne garder que les abonnements non remboursés
             cancelled_df = cancelled_df[~refund_mask]
             st.info(f"ℹ️ {refund_count} abonnements remboursés ont été exclus.")
@@ -334,14 +299,12 @@ def process_csv(uploaded_files, include_youtube=False):
         cutoff_date = datetime(today.year, today.month, 5)
         
         # Filtrer les abonnements annulés qui ont une date de prochaine commande après le 5 du mois
-        # OU qui ont une date de prochaine commande nulle/invalide (les garder par précaution)
         valid_cancelled_df = cancelled_df[cancelled_df['Next order date'] > cutoff_date]
         
         excluded_count = len(cancelled_df) - len(valid_cancelled_df)
         if excluded_count > 0:
             st.info(f"ℹ️ {excluded_count} abonnements annulés ont été exclus car leur prochaine date de commande est avant le 5 du mois.")
         
-        st.write(f"ℹ️ Sur {len(cancelled_df)} abonnements annulés, {len(valid_cancelled_df)} ont une date de commande postérieure au 5 du mois et sont conservés.")
     except Exception as e:
         st.error(f"Erreur lors de l'analyse des dates de commande: {e}")
         valid_cancelled_df = cancelled_df.copy()  # En cas d'erreur, garder tous les abonnements annulés par précaution
@@ -392,15 +355,6 @@ if uploaded_files:
         
         with col2:
             st.metric("Abonnements annulés", len(cancelled_df))
-        
-        # Afficher les aperçus
-        st.write("## 📋 Aperçu des données")
-        
-        st.write(f"📌 **Abonnements actifs ({len(active_df)} lignes) :**")
-        st.dataframe(active_df)
-
-        st.write(f"📌 **Abonnements annulés ({len(cancelled_df)} lignes) :**")
-        st.dataframe(cancelled_df)
         
         # Option d'exportation
         st.write("## 💾 Exportation des données")
@@ -479,11 +433,9 @@ if uploaded_files:
             mask = all_df['Delivery name'].str.contains(name_pattern, case=False, na=False, regex=True)
             test_count = mask.sum()
             if test_count > 0:
-                st.warning(f"⚠️ {test_count} abonnements 'Brice N Guessan' ont été détectés après la préparation des données finales!")
-                st.dataframe(all_df[mask][['Customer ID', 'Delivery name']].head())
                 # Les supprimer
                 all_df = all_df[~mask]
-                st.info(f"ℹ️ {test_count} abonnements de test 'Brice N Guessan' supprimés des données finales.")
+                st.info(f"ℹ️ {test_count} entrées de test supplémentaires ont été éliminées.")
             
             # Séparer par pays
             france_df = all_df[all_df.apply(is_france, axis=1)]
