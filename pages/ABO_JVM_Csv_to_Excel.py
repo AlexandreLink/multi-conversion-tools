@@ -5,6 +5,7 @@ from datetime import datetime
 import os
 import re
 from dotenv import load_dotenv
+import io
 
 # Chargement des variables d'environnement
 load_dotenv()
@@ -449,17 +450,20 @@ if uploaded_files:
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 
                 # Définir le nom du fichier
-                fr_filename = f"{file_prefix}_france_{timestamp}.csv" if file_prefix else f"france_{timestamp}.csv"
+                fr_filename = f"{file_prefix}_france_{timestamp}.xlsx" if file_prefix else f"france_{timestamp}.xlsx"
                 
-                # Convertir le DataFrame en CSV
-                fr_csv = france_df.to_csv(index=False)
+                # Créer un buffer pour stocker le fichier Excel
+                buffer = io.BytesIO()
+                with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+                    france_df.to_excel(writer, index=False, sheet_name='Abonnements France')
+                buffer.seek(0)
                 
                 # Proposer le téléchargement
                 st.download_button(
                     label="📥 Télécharger les abonnements France",
-                    data=fr_csv,
+                    data=buffer,
                     file_name=fr_filename,
-                    mime="text/csv"
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
                 
                 st.success(f"✅ Fichier France prêt à être téléchargé ({len(france_df)} abonnements)")
@@ -470,17 +474,20 @@ if uploaded_files:
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 
                 # Définir le nom du fichier
-                int_filename = f"{file_prefix}_etranger_{timestamp}.csv" if file_prefix else f"etranger_{timestamp}.csv"
+                int_filename = f"{file_prefix}_etranger_{timestamp}.xlsx" if file_prefix else f"etranger_{timestamp}.xlsx"
                 
-                # Convertir le DataFrame en CSV
-                int_csv = etranger_df.to_csv(index=False)
+                # Créer un buffer pour stocker le fichier Excel
+                buffer = io.BytesIO()
+                with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+                    etranger_df.to_excel(writer, index=False, sheet_name='Abonnements Etranger')
+                buffer.seek(0)
                 
                 # Proposer le téléchargement
                 st.download_button(
                     label="📥 Télécharger les abonnements Étranger",
-                    data=int_csv,
+                    data=buffer,
                     file_name=int_filename,
-                    mime="text/csv"
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
                 
                 st.success(f"✅ Fichier Étranger prêt à être téléchargé ({len(etranger_df)} abonnements)")
