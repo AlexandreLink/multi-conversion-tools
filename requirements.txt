@@ -2,3 +2,8 @@ openpyxl
 python-docx
 xlrd>=2.0.1
 openai
+streamlit
+pandas
+pymongo
+python-dotenv
+xlsxwriter
