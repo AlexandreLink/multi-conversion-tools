@@ -325,65 +325,81 @@ if uploaded_file:
                 st.write("- Email client: colonne contenant l'adresse email")
                 st.write("- Pays: colonne contenant le pays de livraison")
                 st.write("- Nom produit: colonne contenant le nom des produits")
-                st.stop()
-            
-            # Configuration des filtres
-            st.write("## ⚙️ Configuration des filtres")
-            
-            # Filtre par statut de paiement
-            if 'payment_status' in detected_columns:
-                status_col = detected_columns['payment_status']
-                unique_statuses = df[status_col].dropna().unique().tolist()
-                
-                selected_statuses = st.multiselect(
-                    f"Statuts de paiement à inclure (colonne: {status_col})",
-                    options=unique_statuses,
-                    default=['paid'] if 'paid' in unique_statuses else unique_statuses
-                )
+                st.write("**Utilisez la configuration manuelle ci-dessus pour spécifier les colonnes.**")
             else:
-                selected_statuses = []
-                st.info("ℹ️ Aucune colonne de statut de paiement détectée.")
-            
-            # Filtre par type de ligne
-            if 'line_type' in detected_columns:
-                line_type_col = detected_columns['line_type']
-                unique_line_types = df[line_type_col].dropna().unique().tolist()
+                st.success("✅ Toutes les colonnes critiques ont été détectées !")
                 
-                selected_line_types = st.multiselect(
-                    f"Types de ligne à inclure (colonne: {line_type_col})",
-                    options=unique_line_types,
-                    default=['Line Item'] if 'Line Item' in unique_line_types else unique_line_types
-                )
-            else:
-                selected_line_types = []
-                st.info("ℹ️ Aucune colonne de type de ligne détectée.")
-            
-            # Bouton d'analyse préliminaire
-            if st.button("🔎 Analyser les produits disponibles", type="secondary"):
-                with st.spinner("🔄 Analyse des produits..."):
-                    
-                    # Nettoyer et filtrer les données
-                    df_clean = clean_and_filter_data(df, detected_columns, selected_statuses, selected_line_types)
-                    
-                    if len(df_clean) == 0:
-                        st.error("❌ Aucune donnée ne correspond aux filtres sélectionnés.")
-                        st.stop()
-                    
-                    st.info(f"📊 {len(df_clean)} lignes retenues après filtrage")
-                    
-                    # Créer les variants par utilisateur
-                    user_variants = create_user_variants(df_clean, detected_columns)
-                    
-                    # Extraire tous les produits uniques
-                    unique_products = extract_unique_products(user_variants)
-                    
-                    # Stocker dans session state pour utilisation ultérieure
-                    st.session_state['df_clean'] = df_clean
-                    st.session_state['detected_columns'] = detected_columns
-                    st.session_state['user_variants'] = user_variants
-                    st.session_state['unique_products'] = unique_products
-                    
-                    st.success("✅ Analyse terminée ! Configurez l'ordre des produits ci-dessous.")
+                # Configuration des filtres (seulement si les colonnes critiques sont OK)
+                st.write("## ⚙️ Configuration des filtres")
+                
+                # Filtre par statut de paiement
+                if 'payment_status' in detected_columns:
+                    try:
+                        status_col = detected_columns['payment_status']
+                        unique_statuses = df[status_col].dropna().unique().tolist()
+                        
+                        selected_statuses = st.multiselect(
+                            f"Statuts de paiement à inclure (colonne: {status_col})",
+                            options=unique_statuses,
+                            default=['paid'] if 'paid' in unique_statuses else unique_statuses[:1] if unique_statuses else []
+                        )
+                    except Exception as e:
+                        st.warning(f"Problème avec la colonne statut: {e}")
+                        selected_statuses = []
+                else:
+                    selected_statuses = []
+                    st.info("ℹ️ Aucune colonne de statut de paiement détectée.")
+                
+                # Filtre par type de ligne
+                if 'line_type' in detected_columns:
+                    try:
+                        line_type_col = detected_columns['line_type']
+                        unique_line_types = df[line_type_col].dropna().unique().tolist()
+                        
+                        selected_line_types = st.multiselect(
+                            f"Types de ligne à inclure (colonne: {line_type_col})",
+                            options=unique_line_types,
+                            default=['Line Item'] if 'Line Item' in unique_line_types else unique_line_types[:1] if unique_line_types else []
+                        )
+                    except Exception as e:
+                        st.warning(f"Problème avec la colonne type de ligne: {e}")
+                        selected_line_types = []
+                else:
+                    selected_line_types = []
+                    st.info("ℹ️ Aucune colonne de type de ligne détectée.")
+                
+                # Bouton d'analyse préliminaire
+                if st.button("🔎 Analyser les produits disponibles", type="secondary"):
+                    with st.spinner("🔄 Analyse des produits..."):
+                        try:
+                            # Nettoyer et filtrer les données
+                            df_clean = clean_and_filter_data(df, detected_columns, selected_statuses, selected_line_types)
+                            
+                            if len(df_clean) == 0:
+                                st.error("❌ Aucune donnée ne correspond aux filtres sélectionnés.")
+                                st.write("Essayez d'ajuster les filtres ou vérifiez le contenu du fichier.")
+                            else:
+                                st.info(f"📊 {len(df_clean)} lignes retenues après filtrage")
+                                
+                                # Créer les variants par utilisateur
+                                user_variants = create_user_variants(df_clean, detected_columns)
+                                
+                                # Extraire tous les produits uniques
+                                unique_products = extract_unique_products(user_variants)
+                                
+                                # Stocker dans session state pour utilisation ultérieure
+                                st.session_state['df_clean'] = df_clean
+                                st.session_state['detected_columns'] = detected_columns
+                                st.session_state['user_variants'] = user_variants
+                                st.session_state['unique_products'] = unique_products
+                                
+                                st.success("✅ Analyse terminée ! Configurez l'ordre des produits ci-dessous.")
+                        
+                        except Exception as e:
+                            st.error(f"Erreur lors de l'analyse: {str(e)}")
+                            st.write("Détails de l'erreur pour le débogage :")
+                            st.write(f"Type d'erreur: {type(e).__name__}")
+                            st.write(f"Message: {str(e)}")
 
 # Configuration des produits (seulement si l'analyse a été faite)
 if 'unique_products' in st.session_state:
