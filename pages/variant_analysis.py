@@ -72,7 +72,111 @@ def extract_products_from_orders(df, columns):
     
     return unique_products, df_filtered
 
-def create_variants_by_user(df_filtered, columns):
+def translate_countries(countries):
+    """Traduit les noms de pays en français"""
+    translation = {
+        'France': 'France',
+        'Belgium': 'Belgique', 
+        'Switzerland': 'Suisse',
+        'Canada': 'Canada',
+        'United States': 'États-Unis',
+        'Germany': 'Allemagne',
+        'Spain': 'Espagne',
+        'Italy': 'Italie',
+        'Netherlands': 'Pays-Bas',
+        'United Kingdom': 'Royaume-Uni',
+        'Luxembourg': 'Luxembourg',
+        'Austria': 'Autriche',
+        'Portugal': 'Portugal',
+        'Denmark': 'Danemark',
+        'Finland': 'Finlande',
+        'Sweden': 'Suède',
+        'Norway': 'Norvège',
+        'Ireland': 'Irlande',
+        'Poland': 'Pologne',
+        'Czech Republic': 'République tchèque',
+        'Hungary': 'Hongrie',
+        'Greece': 'Grèce',
+        'Reunion': 'La Réunion',
+        'Guadeloupe': 'Guadeloupe',
+        'Martinique': 'Martinique',
+        'French Guiana': 'Guyane française',
+        'New Caledonia': 'Nouvelle-Calédonie',
+        'French Polynesia': 'Polynésie française',
+        'Monaco': 'Monaco',
+        'Mayotte': 'Mayotte',
+        'Saint Pierre and Miquelon': 'Saint-Pierre-et-Miquelon'
+    }
+    return [translation.get(country, country) for country in countries]
+
+def reorder_variant_with_main_product_first(variant, main_product):
+    """Réorganise le variant pour mettre le produit principal en premier"""
+    
+    # Séparer les parties du variant
+    parts = variant.split(' + ')
+    main_part = None
+    other_parts = []
+    
+    for part in parts:
+        # Extraire le nom du produit (après "1x ", "2x ", etc.)
+        if '× ' in part:
+            product_name = part.split('× ', 1)[1]
+        elif 'x ' in part:
+            product_name = part.split('x ', 1)[1]
+        else:
+            product_name = part
+        
+        if product_name.strip() == main_product:
+            main_part = part
+        else:
+            other_parts.append(part)
+    
+    # Reconstruire avec le produit principal en premier
+    if main_part:
+        reordered_parts = [main_part] + sorted(other_parts)
+        return ' + '.join(reordered_parts)
+    else:
+        return variant  # Si pas trouvé, retourner l'original
+
+def calculate_weight_and_foreign(variants, user_data, product_weights):
+    """Calcule le poids estimé et le nombre d'utilisateurs à l'étranger"""
+    
+    results = {}
+    
+    for variant, countries in variants:
+        # Calculer le poids estimé
+        total_weight = 0.0
+        parts = variant.split(' + ')
+        
+        for part in parts:
+            # Extraire quantité et produit
+            if '× ' in part:
+                qty_str, product = part.split('× ', 1)
+            elif 'x ' in part:
+                qty_str, product = part.split('x ', 1)
+            else:
+                qty_str, product = '1', part
+            
+            try:
+                qty = int(qty_str)
+            except:
+                qty = 1
+            
+            weight = product_weights.get(product.strip(), 0.0)  # Utiliser le poids configuré
+            total_weight += qty * weight
+        
+        # Calculer les utilisateurs à l'étranger (non-France)
+        total_users = sum(countries.values())
+        france_users = countries.get('France', 0)
+        foreign_users = total_users - france_users
+        
+        results[variant] = {
+            'weight': f"{total_weight:.3f}kg",
+            'total': total_users,
+            'foreign': foreign_users
+        }
+    
+    return results
     """Crée les variants en regroupant par utilisateur"""
     
     email_col = columns['email']
@@ -129,12 +233,14 @@ def organize_by_user_order(user_data, ordered_products):
             
             # Ce variant contient-il ce produit ?
             if product in variant:
-                section_variants.append((variant, countries))
+                # Réorganiser le variant avec le produit principal en premier
+                reordered_variant = reorder_variant_with_main_product_first(variant, product)
+                section_variants.append((reordered_variant, countries))
                 used_variants.add(variant)
         
         if section_variants:
-            # Trier par popularité
-            section_variants.sort(key=lambda x: sum(x[1].values()), reverse=True)
+            # Trier par ordre alphabétique au lieu de popularité
+            section_variants.sort(key=lambda x: x[0])
             sections[product] = section_variants
     
     # Ajouter les variants restants
@@ -144,44 +250,103 @@ def organize_by_user_order(user_data, ordered_products):
             remaining.append((variant, countries))
     
     if remaining:
-        remaining.sort(key=lambda x: sum(x[1].values()), reverse=True)
+        remaining.sort(key=lambda x: x[0])  # Alphabétique aussi
         sections["Autres combinaisons"] = remaining
     
     return sections
 
-def create_final_dataframe(sections):
-    """Crée le DataFrame final organisé"""
+def create_final_dataframe(sections, user_data, product_weights):
+    """Crée le DataFrame final organisé avec colonnes poids et étranger"""
     
-    # Obtenir tous les pays
+    # Obtenir tous les pays et les traduire
     all_countries = set()
     for section_variants in sections.values():
         for _, countries in section_variants:
             all_countries.update(countries.keys())
-    all_countries = sorted(all_countries)
+    
+    all_countries = sorted(translate_countries(list(all_countries)))
     
     # Construire le DataFrame
     rows = []
     
     for section_name, variants in sections.items():
         # Titre de section
-        title_row = {'Variant': f"--- {section_name.upper()} ---", 'Total utilisateurs': ''}
+        title_row = {
+            'Variant': f"--- {section_name.upper()} ---", 
+            'Poids des packs': '',
+            'Nombre de packs': '',
+            'Packs en livraison à l\'étranger': ''
+        }
         for country in all_countries:
             title_row[country] = ''
         rows.append(title_row)
         
+        # Calculer poids et étranger pour cette section
+        variant_stats = calculate_weight_and_foreign(variants, user_data, product_weights)
+        
         # Variants de la section
         for variant, countries in variants:
-            total = sum(countries.values())
+            stats = variant_stats[variant]
+            
+            # Traduire les noms de pays dans les données
+            translated_countries = {}
+            country_translation = {
+                'France': 'France',
+                'Belgium': 'Belgique', 
+                'Switzerland': 'Suisse',
+                'Canada': 'Canada',
+                'United States': 'États-Unis',
+                'Germany': 'Allemagne',
+                'Spain': 'Espagne',
+                'Italy': 'Italie',
+                'Netherlands': 'Pays-Bas',
+                'United Kingdom': 'Royaume-Uni',
+                'Luxembourg': 'Luxembourg',
+                'Austria': 'Autriche',
+                'Portugal': 'Portugal',
+                'Denmark': 'Danemark',
+                'Finland': 'Finlande',
+                'Sweden': 'Suède',
+                'Norway': 'Norvège',
+                'Ireland': 'Irlande',
+                'Poland': 'Pologne',
+                'Czech Republic': 'République tchèque',
+                'Hungary': 'Hongrie',
+                'Greece': 'Grèce',
+                'Reunion': 'La Réunion',
+                'Guadeloupe': 'Guadeloupe',
+                'Martinique': 'Martinique',
+                'French Guiana': 'Guyane française',
+                'New Caledonia': 'Nouvelle-Calédonie',
+                'French Polynesia': 'Polynésie française',
+                'Monaco': 'Monaco',
+                'Mayotte': 'Mayotte',
+                'Saint Pierre and Miquelon': 'Saint-Pierre-et-Miquelon'
+            }
+            
+            for original_country, count in countries.items():
+                french_country = country_translation.get(original_country, original_country)
+                translated_countries[french_country] = count
+            
             row = {
                 'Variant': variant.replace('x ', '× '),
-                'Total utilisateurs': total
+                'Poids des packs': stats['weight'],
+                'Nombre de packs': stats['total'],
+                'Packs en livraison à l\'étranger': stats['foreign']
             }
+            
             for country in all_countries:
-                row[country] = countries.get(country, 0)
+                row[country] = translated_countries.get(country, 0)
+            
             rows.append(row)
         
         # Ligne vide
-        empty_row = {'Variant': '', 'Total utilisateurs': ''}
+        empty_row = {
+            'Variant': '', 
+            'Poids des packs': '',
+            'Nombre de packs': '',
+            'Packs en livraison à l\'étranger': ''
+        }
         for country in all_countries:
             empty_row[country] = ''
         rows.append(empty_row)
@@ -236,32 +401,58 @@ if uploaded_file:
         Sélectionnez les produits que vous voulez comme "sections principales" et définissez leur ordre d'affichage.
         """)
     
-    # Étape 4: Configuration utilisateur
-    st.write("## ⚙️ Configuration de l'organisation")
-    
-    selected_products = st.multiselect(
-        "Choisissez les produits principaux (dans l'ordre d'affichage souhaité) :",
-        options=unique_products,
-        help="L'ordre de sélection = ordre des sections dans le rapport final"
-    )
-    
+    # Étape 4: Configuration des poids
     if selected_products:
-        st.write("### 📋 Aperçu de l'organisation")
-        for i, product in enumerate(selected_products, 1):
-            st.write(f"**{i}. {product}** → Tous les variants contenant ce produit")
+        st.write("## ⚖️ Configuration des poids des produits")
         
-        if len(selected_products) < len(unique_products):
-            st.write(f"**{len(selected_products) + 1}. Autres combinaisons** → Variants restants")
+        st.write("Renseignez le poids de chaque produit pour calculer automatiquement le poids des variants :")
         
-        # Étape 5: Génération
-        if st.button("🚀 Générer le rapport personnalisé", type="primary"):
-            with st.spinner("🔄 Génération en cours..."):
-                
-                # Organiser selon la configuration
-                sections = organize_by_user_order(user_data, selected_products)
-                
-                # Créer le DataFrame final
-                final_df = create_final_dataframe(sections)
+        product_weights = {}
+        
+        # Interface pour saisir les poids
+        cols = st.columns(2)
+        
+        for i, product in enumerate(unique_products):
+            col_index = i % 2
+            with cols[col_index]:
+                weight = st.number_input(
+                    f"Poids de **{product}** (kg)",
+                    min_value=0.0,
+                    max_value=50.0,
+                    value=1.0,
+                    step=0.1,
+                    format="%.3f",
+                    key=f"weight_{i}"
+                )
+                product_weights[product] = weight
+        
+        # Étape 5: Configuration de l'organisation
+        st.write("## ⚙️ Configuration de l'organisation")
+        
+        selected_products = st.multiselect(
+            "Choisissez les produits principaux (dans l'ordre d'affichage souhaité) :",
+            options=unique_products,
+            help="L'ordre de sélection = ordre des sections dans le rapport final"
+        )
+        
+        if selected_products:
+            st.write("### 📋 Aperçu de l'organisation")
+            for i, product in enumerate(selected_products, 1):
+                weight = product_weights.get(product, 0.0)
+                st.write(f"**{i}. {product}** ({weight:.3f}kg) → Tous les variants contenant ce produit")
+            
+            if len(selected_products) < len(unique_products):
+                st.write(f"**{len(selected_products) + 1}. Autres combinaisons** → Variants restants")
+            
+            # Étape 6: Génération
+            if st.button("🚀 Générer le rapport personnalisé", type="primary"):
+                with st.spinner("🔄 Génération en cours..."):
+                    
+                    # Organiser selon la configuration
+                    sections = organize_by_user_order(user_data, selected_products)
+                    
+                    # Créer le DataFrame final avec les poids configurés
+                    final_df = create_final_dataframe(sections, user_data, product_weights)
                 
                 # Statistiques
                 st.write("## 📈 Résultats")
