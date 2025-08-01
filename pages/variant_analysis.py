@@ -164,7 +164,7 @@ def create_final_dataframe(sections):
     
     for section_name, variants in sections.items():
         # Titre de section
-        title_row = {'Variant': f"=== {section_name.upper()} ===", 'Total utilisateurs': ''}
+        title_row = {'Variant': f"--- {section_name.upper()} ---", 'Total utilisateurs': ''}
         for country in all_countries:
             title_row[country] = ''
         rows.append(title_row)
@@ -297,7 +297,7 @@ if uploaded_file:
                     })
                     
                     for row_num, (_, row) in enumerate(final_df.iterrows(), start=1):
-                        if isinstance(row['Variant'], str) and row['Variant'].startswith('==='):
+                        if isinstance(row['Variant'], str) and row['Variant'].startswith('---'):
                             worksheet.set_row(row_num, None, title_format)
                 
                 buffer.seek(0)
