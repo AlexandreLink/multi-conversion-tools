@@ -349,201 +349,72 @@ def create_final_dataframe(sections, user_data, product_weights):
         }
         for country in all_countries:
             empty_row[country] = ''
-        results.append(empty_row)
+        rows.append(empty_row)
     
-    # Ajouter la section "Autres combinaisons" si elle existe
-    if "Autres combinaisons" in variant_groups:
-        # Titre de section
-        section_title = "=== AUTRES COMBINAISONS ==="
-        group_row = {'Variant': section_title, 'Total utilisateurs': ''}
-        for country in all_countries:
-            group_row[country] = ''
-        results.append(group_row)
-        
-        # Variants de la section
-        other_variants = sorted(variant_groups["Autres combinaisons"], 
-                              key=lambda x: sum(x[1].values()), reverse=True)
-        
-        for variant, country_stats in other_variants:
-            total = sum(country_stats.values())
-            clean_variant = variant.replace('x ', '× ').replace(' + ', ' + ')
-            
-            row = {
-                'Variant': clean_variant,
-                'Total utilisateurs': total
-            }
-            
-            for country in all_countries:
-                row[country] = country_stats.get(country, 0)
-            
-            results.append(row)
-    
-    # Convertir en DataFrame
-    df_results = pd.DataFrame(results)
-    
-    return df_results
-
-def create_summary_stats(variant_groups, all_countries):
-    """Crée un DataFrame avec les statistiques par groupe"""
-    
-    summary_data = []
-    
-    for group_name, variants in variant_groups.items():
-        total_users = sum(sum(country_stats.values()) for _, country_stats in variants)
-        total_variants = len(variants)
-        
-        # Calculer le top pays pour ce groupe
-        country_totals = {}
-        for _, country_stats in variants:
-            for country, count in country_stats.items():
-                country_totals[country] = country_totals.get(country, 0) + count
-        
-        top_country = max(country_totals.items(), key=lambda x: x[1]) if country_totals else ("N/A", 0)
-        
-        summary_data.append({
-            'Produit/Groupe': group_name,
-            'Nombre de variants': total_variants,
-            'Total utilisateurs': total_users,
-            'Pays principal': f"{top_country[0]} ({top_country[1]})"
-        })
-    
-    return pd.DataFrame(summary_data)
+    return pd.DataFrame(rows)
 
 # Interface Streamlit
-st.title("🔍 Analyseur de Variants de Commandes")
-st.write("Analysez automatiquement les combinaisons de produits achetés par vos clients et organisez-les selon vos préférences.")
+st.title("🔍 Analyseur de Variants - Configuration Personnalisée")
+st.write("Analysez vos commandes et organisez les variants selon vos préférences.")
 
-# Upload du fichier
-uploaded_file = st.file_uploader(
-    "📁 Téléversez votre fichier Excel d'export des commandes", 
-    type=['xlsx', 'xls']
-)
+# Étape 1: Upload
+uploaded_file = st.file_uploader("📁 Téléversez votre export Excel", type=['xlsx', 'xls'])
 
 if uploaded_file:
-    with st.spinner("📊 Chargement et analyse du fichier..."):
+    # Charger le fichier
+    with st.spinner("📊 Chargement du fichier..."):
+        df = pd.read_excel(uploaded_file)
+        st.success(f"✅ Fichier chargé ! {len(df)} lignes trouvées.")
+    
+    # Étape 2: Détection des colonnes
+    st.write("## 🔍 Détection des colonnes")
+    columns = detect_columns(df)
+    
+    if len(columns) >= 3:  # Au minimum email, pays, produit
+        st.success("✅ Colonnes détectées automatiquement")
+        for field, col_name in columns.items():
+            st.write(f"- **{field.title()}**: `{col_name}`")
+    else:
+        st.error("❌ Colonnes manquantes. Vérifiez votre fichier.")
+        st.stop()
+    
+    # Étape 3: Extraction des produits
+    st.write("## 🎯 Produits détectés")
+    with st.spinner("🔄 Analyse des produits..."):
         try:
-            # Lire le fichier Excel
-            df = pd.read_excel(uploaded_file)
+            unique_products, df_filtered = extract_products_from_orders(df, columns)
+            st.write(f"Debug - Lignes après filtrage: {len(df_filtered)}")
+            st.write(f"Debug - Colonnes utilisées: {columns}")
             
-            st.success(f"✅ Fichier chargé avec succès ! {len(df)} lignes trouvées.")
-        
+            user_data = create_variants_by_user(df_filtered, columns)
         except Exception as e:
-            st.error(f"❌ Erreur lors du chargement du fichier: {str(e)}")
-            st.write("Veuillez vérifier que le fichier est un export Excel valide.")
+            st.error(f"Erreur lors de l'analyse des produits: {str(e)}")
+            st.write(f"Colonnes détectées: {columns}")
+            st.write(f"Taille du DataFrame: {len(df)}")
+            st.write(f"Premières lignes du DataFrame:")
+            st.write(df.head())
             st.stop()
-            
-            # Analyse automatique de la structure
-            st.write("## 🔍 Analyse automatique de la structure")
-            
-            detected_columns, available_columns = analyze_file_structure(df)
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.write("### Colonnes détectées automatiquement")
-                for field, column in detected_columns.items():
-                    st.write(f"- **{field.replace('_', ' ').title()}**: `{column}`")
-            
-            with col2:
-                st.write("### Toutes les colonnes disponibles")
-                st.write(df.columns.tolist())
-            
-            # Vérification des colonnes critiques
-            critical_fields = ['email', 'country', 'product_name']
-            missing_critical = [field for field in critical_fields if field not in detected_columns]
-            
-            if missing_critical:
-                st.error(f"❌ Colonnes critiques manquantes: {', '.join(missing_critical)}")
-                st.write("**Aide à la configuration:**")
-                st.write("- Email client: colonne contenant l'adresse email")
-                st.write("- Pays: colonne contenant le pays de livraison")
-                st.write("- Nom produit: colonne contenant le nom des produits")
-                st.write("**Utilisez la configuration manuelle ci-dessus pour spécifier les colonnes.**")
-            else:
-                st.success("✅ Toutes les colonnes critiques ont été détectées !")
-                
-                # Configuration des filtres (seulement si les colonnes critiques sont OK)
-                st.write("## ⚙️ Configuration des filtres")
-                
-                # Filtre par statut de paiement
-                if 'payment_status' in detected_columns:
-                    try:
-                        status_col = detected_columns['payment_status']
-                        unique_statuses = df[status_col].dropna().unique().tolist()
-                        
-                        selected_statuses = st.multiselect(
-                            f"Statuts de paiement à inclure (colonne: {status_col})",
-                            options=unique_statuses,
-                            default=['paid'] if 'paid' in unique_statuses else unique_statuses[:1] if unique_statuses else []
-                        )
-                    except Exception as e:
-                        st.warning(f"Problème avec la colonne statut: {e}")
-                        selected_statuses = []
-                else:
-                    selected_statuses = []
-                    st.info("ℹ️ Aucune colonne de statut de paiement détectée.")
-                
-                # Filtre par type de ligne
-                if 'line_type' in detected_columns:
-                    try:
-                        line_type_col = detected_columns['line_type']
-                        unique_line_types = df[line_type_col].dropna().unique().tolist()
-                        
-                        selected_line_types = st.multiselect(
-                            f"Types de ligne à inclure (colonne: {line_type_col})",
-                            options=unique_line_types,
-                            default=['Line Item'] if 'Line Item' in unique_line_types else unique_line_types[:1] if unique_line_types else []
-                        )
-                    except Exception as e:
-                        st.warning(f"Problème avec la colonne type de ligne: {e}")
-                        selected_line_types = []
-                else:
-                    selected_line_types = []
-                    st.info("ℹ️ Aucune colonne de type de ligne détectée.")
-                
-                # Bouton d'analyse préliminaire
-                if st.button("🔎 Analyser les produits disponibles", type="secondary"):
-                    with st.spinner("🔄 Analyse des produits..."):
-                        try:
-                            # Nettoyer et filtrer les données
-                            df_clean = clean_and_filter_data(df, detected_columns, selected_statuses, selected_line_types)
-                            
-                            if len(df_clean) == 0:
-                                st.error("❌ Aucune donnée ne correspond aux filtres sélectionnés.")
-                                st.write("Essayez d'ajuster les filtres ou vérifiez le contenu du fichier.")
-                            else:
-                                st.info(f"📊 {len(df_clean)} lignes retenues après filtrage")
-                                
-                                # Créer les variants par utilisateur
-                                user_variants = create_user_variants(df_clean, detected_columns)
-                                
-                                # Extraire tous les produits uniques
-                                unique_products = extract_unique_products(user_variants)
-                                
-                                # Stocker dans session state pour utilisation ultérieure
-                                st.session_state['df_clean'] = df_clean
-                                st.session_state['detected_columns'] = detected_columns
-                                st.session_state['user_variants'] = user_variants
-                                st.session_state['unique_products'] = unique_products
-                                
-                                st.success("✅ Analyse terminée ! Configurez l'ordre des produits ci-dessous.")
-                        
-                        except Exception as e:
-                            st.error(f"Erreur lors de l'analyse: {str(e)}")
-                            st.write("Détails de l'erreur pour le débogage :")
-                            st.write(f"Type d'erreur: {type(e).__name__}")
-                            st.write(f"Message: {str(e)}")
-
-# Configuration des produits (seulement si l'analyse a été faite)
-if 'unique_products' in st.session_state:
-    st.write("## 🎯 Configuration de l'organisation des variants")
     
-    unique_products = st.session_state['unique_products']
+    st.success(f"✅ {len(unique_products)} produits trouvés | {len(user_data)} utilisateurs analysés")
     
-    st.write("### Produits détectés automatiquement")
-    st.write("Sélectionnez les produits principaux et définissez leur ordre d'affichage :")
+    # Afficher les produits
+    col1, col2 = st.columns([2, 1])
     
-    # Interface de sélection et d'ordonnancement
+    with col1:
+        st.write("**Produits disponibles :**")
+        for i, product in enumerate(unique_products, 1):
+            st.write(f"{i}. {product}")
+    
+    with col2:
+        st.info("""
+        **Instructions :**
+        
+        Sélectionnez les produits que vous voulez comme "sections principales" et définissez leur ordre d'affichage.
+        """)
+    
+    st.success(f"✅ {len(unique_products)} produits trouvés | {len(user_data)} utilisateurs analysés")
+    
+    # Afficher les produits
     col1, col2 = st.columns([2, 1])
     
     with col1:
