@@ -72,6 +72,41 @@ def extract_products_from_orders(df, columns):
     
     return unique_products, df_filtered
 
+def create_variants_by_user(df_filtered, columns):
+    """Crée les variants en regroupant par utilisateur"""
+    
+    email_col = columns['email']
+    country_col = columns['country']
+    product_col = columns['product']
+    quantity_col = columns.get('quantity')
+    
+    user_data = {}
+    
+    # Regrouper par email
+    for email, user_orders in df_filtered.groupby(email_col):
+        country = user_orders[country_col].iloc[0]
+        
+        # Calculer les produits et quantités pour cet utilisateur
+        products = defaultdict(int)
+        for _, row in user_orders.iterrows():
+            product = row[product_col]
+            qty = int(row[quantity_col]) if quantity_col and pd.notna(row[quantity_col]) else 1
+            products[product] += qty
+        
+        # Créer le variant
+        variant_parts = []
+        for product, qty in sorted(products.items()):
+            variant_parts.append(f"{qty}x {product}")
+        variant = " + ".join(variant_parts)
+        
+        user_data[email] = {
+            'variant': variant,
+            'country': country,
+            'products': dict(products)
+        }
+    
+    return user_data
+
 def translate_countries(countries):
     """Traduit les noms de pays en français"""
     translation = {
