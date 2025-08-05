@@ -301,6 +301,11 @@ def create_final_dataframe(sections, user_data, product_weights):
     
     all_countries = sorted(translate_countries(list(all_countries)))
     
+    # Variables pour le total
+    total_packs = 0
+    total_foreign = 0
+    country_totals = {country: 0 for country in all_countries}
+    
     # Construire le DataFrame
     rows = []
     
@@ -363,6 +368,12 @@ def create_final_dataframe(sections, user_data, product_weights):
                 french_country = country_translation.get(original_country, original_country)
                 translated_countries[french_country] = count
             
+            # Ajouter aux totaux
+            total_packs += stats['total']
+            total_foreign += stats['foreign']
+            for country in all_countries:
+                country_totals[country] += translated_countries.get(country, 0)
+            
             row = {
                 'Variant': variant.replace('x ', '× '),
                 'Poids des packs': stats['weight'],
@@ -385,6 +396,19 @@ def create_final_dataframe(sections, user_data, product_weights):
         for country in all_countries:
             empty_row[country] = ''
         rows.append(empty_row)
+    
+    # Ajouter la ligne de TOTAL à la fin
+    total_row = {
+        'Variant': 'TOTAL PACKS',
+        'Poids des packs': '',  # Pas de poids total comme demandé
+        'Nombre de packs': total_packs,
+        'Packs en livraison à l\'étranger': total_foreign
+    }
+    
+    for country in all_countries:
+        total_row[country] = country_totals[country]
+    
+    rows.append(total_row)
     
     return pd.DataFrame(rows)
 
@@ -418,9 +442,6 @@ if uploaded_file:
     with st.spinner("🔄 Analyse des produits..."):
         try:
             unique_products, df_filtered = extract_products_from_orders(df, columns)
-            st.write(f"Debug - Lignes après filtrage: {len(df_filtered)}")
-            st.write(f"Debug - Colonnes utilisées: {columns}")
-            
             user_data = create_variants_by_user(df_filtered, columns)
         except Exception as e:
             st.error(f"Erreur lors de l'analyse des produits: {str(e)}")
@@ -447,75 +468,89 @@ if uploaded_file:
         Sélectionnez les produits que vous voulez comme "sections principales" et définissez leur ordre d'affichage.
         """)
     
-    st.success(f"✅ {len(unique_products)} produits trouvés | {len(user_data)} utilisateurs analysés")
-    
-    # Afficher les produits
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        st.write("**Produits disponibles :**")
-        for i, product in enumerate(unique_products, 1):
-            st.write(f"{i}. {product}")
-    
-    with col2:
-        st.info("""
-        **Instructions :**
-        
-        Sélectionnez les produits que vous voulez comme "sections principales" et définissez leur ordre d'affichage.
-        """)
-    
     # Étape 4: Configuration utilisateur AVANT les poids
     st.write("## ⚙️ Sélection des produits principaux")
+    
+    # Utiliser session_state pour éviter les rechargements
+    if 'selected_products' not in st.session_state:
+        st.session_state.selected_products = []
     
     selected_products = st.multiselect(
         "Choisissez les produits principaux (dans l'ordre d'affichage souhaité) :",
         options=unique_products,
-        help="L'ordre de sélection = ordre des sections dans le rapport final"
+        default=st.session_state.selected_products,
+        help="L'ordre de sélection = ordre des sections dans le rapport final",
+        key="product_selector"
     )
     
+    # Sauvegarder la sélection
+    st.session_state.selected_products = selected_products
+    
     if selected_products:
-        # Étape 5: Configuration des poids (seulement après sélection)
+        # Étape 5: Configuration des poids (optimisée)
         st.write("## ⚖️ Configuration des poids des produits")
         
         st.write("Renseignez le poids de chaque produit pour calculer automatiquement le poids des variants :")
         
-        product_weights = {}
+        # Utiliser un formulaire pour éviter les rechargements constants
+        with st.form("weight_configuration"):
+            st.write("**Configurez les poids :**")
+            
+            product_weights = {}
+            
+            # Interface pour saisir les poids (seulement pour les produits sélectionnés)
+            cols = st.columns(2)
+            
+            for i, product in enumerate(unique_products):
+                col_index = i % 2
+                with cols[col_index]:
+                    # Utiliser session_state pour les valeurs par défaut
+                    default_weight = st.session_state.get(f'weight_{product}', 1.0)
+                    
+                    weight = st.number_input(
+                        f"Poids de **{product}** (kg)",
+                        min_value=0.0,
+                        max_value=50.0,
+                        value=default_weight,
+                        step=0.1,
+                        format="%.3f",
+                        key=f"form_weight_{i}"
+                    )
+                    product_weights[product] = weight
+            
+            # Bouton pour valider les poids
+            weights_submitted = st.form_submit_button("✅ Valider les poids", type="secondary")
+            
+            if weights_submitted:
+                # Sauvegarder les poids dans session_state
+                for product, weight in product_weights.items():
+                    st.session_state[f'weight_{product}'] = weight
+                st.success("✅ Poids sauvegardés !")
         
-        # Interface pour saisir les poids (seulement pour les produits sélectionnés)
-        cols = st.columns(2)
-        
-        for i, product in enumerate(unique_products):
-            col_index = i % 2
-            with cols[col_index]:
-                weight = st.number_input(
-                    f"Poids de **{product}** (kg)",
-                    min_value=0.0,
-                    max_value=50.0,
-                    value=1.0,
-                    step=0.1,
-                    format="%.3f",
-                    key=f"weight_{i}"
-                )
-                product_weights[product] = weight
-        
-        # Aperçu de l'organisation
-        st.write("### 📋 Aperçu de l'organisation")
-        for i, product in enumerate(selected_products, 1):
-            weight = product_weights.get(product, 0.0)
-            st.write(f"**{i}. {product}** ({weight:.3f}kg) → Tous les variants contenant ce produit")
-        
-        if len(selected_products) < len(unique_products):
-            st.write(f"**{len(selected_products) + 1}. Autres combinaisons** → Variants restants")
-        
-        # Étape 6: Génération
-        if st.button("🚀 Générer le rapport personnalisé", type="primary"):
-            with st.spinner("🔄 Génération en cours..."):
-                
-                # Organiser selon la configuration
-                sections = organize_by_user_order(user_data, selected_products)
-                
-                # Créer le DataFrame final avec les poids configurés
-                final_df = create_final_dataframe(sections, user_data, product_weights)
+        # Afficher l'aperçu seulement si les poids ont été validés
+        if any(f'weight_{product}' in st.session_state for product in selected_products):
+            st.write("### 📋 Aperçu de l'organisation")
+            for i, product in enumerate(selected_products, 1):
+                weight = st.session_state.get(f'weight_{product}', 1.0)
+                st.write(f"**{i}. {product}** ({weight:.3f}kg) → Tous les variants contenant ce produit")
+            
+            if len(selected_products) < len(unique_products):
+                st.write(f"**{len(selected_products) + 1}. Autres combinaisons** → Variants restants")
+            
+            # Récupérer les poids depuis session_state
+            final_product_weights = {}
+            for product in unique_products:
+                final_product_weights[product] = st.session_state.get(f'weight_{product}', 1.0)
+            
+            # Étape 6: Génération
+            if st.button("🚀 Générer le rapport personnalisé", type="primary"):
+                with st.spinner("🔄 Génération en cours..."):
+                    
+                    # Organiser selon la configuration
+                    sections = organize_by_user_order(user_data, selected_products)
+                    
+                    # Créer le DataFrame final avec les poids configurés
+                    final_df = create_final_dataframe(sections, user_data, final_product_weights)
                 
                 # Statistiques
                 st.write("## 📈 Résultats")
@@ -550,9 +585,21 @@ if uploaded_file:
                         'font_size': 12
                     })
                     
+                    # Format pour la ligne de total
+                    total_format = workbook.add_format({
+                        'bold': True,
+                        'bg_color': '#E6E6E6',
+                        'align': 'center',
+                        'font_size': 11,
+                        'border': 1
+                    })
+                    
                     for row_num, (_, row) in enumerate(final_df.iterrows(), start=1):
-                        if isinstance(row['Variant'], str) and row['Variant'].startswith('---'):
-                            worksheet.set_row(row_num, None, title_format)
+                        if isinstance(row['Variant'], str):
+                            if row['Variant'].startswith('---'):
+                                worksheet.set_row(row_num, None, title_format)
+                            elif row['Variant'] == 'TOTAL PACKS':
+                                worksheet.set_row(row_num, None, total_format)
                 
                 buffer.seek(0)
                 
