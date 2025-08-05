@@ -464,15 +464,24 @@ if uploaded_file:
         Sélectionnez les produits que vous voulez comme "sections principales" et définissez leur ordre d'affichage.
         """)
     
-    # Étape 4: Configuration des poids
+    # Étape 4: Configuration utilisateur AVANT les poids
+    st.write("## ⚙️ Sélection des produits principaux")
+    
+    selected_products = st.multiselect(
+        "Choisissez les produits principaux (dans l'ordre d'affichage souhaité) :",
+        options=unique_products,
+        help="L'ordre de sélection = ordre des sections dans le rapport final"
+    )
+    
     if selected_products:
+        # Étape 5: Configuration des poids (seulement après sélection)
         st.write("## ⚖️ Configuration des poids des produits")
         
         st.write("Renseignez le poids de chaque produit pour calculer automatiquement le poids des variants :")
         
         product_weights = {}
         
-        # Interface pour saisir les poids
+        # Interface pour saisir les poids (seulement pour les produits sélectionnés)
         cols = st.columns(2)
         
         for i, product in enumerate(unique_products):
@@ -489,33 +498,24 @@ if uploaded_file:
                 )
                 product_weights[product] = weight
         
-        # Étape 5: Configuration de l'organisation
-        st.write("## ⚙️ Configuration de l'organisation")
+        # Aperçu de l'organisation
+        st.write("### 📋 Aperçu de l'organisation")
+        for i, product in enumerate(selected_products, 1):
+            weight = product_weights.get(product, 0.0)
+            st.write(f"**{i}. {product}** ({weight:.3f}kg) → Tous les variants contenant ce produit")
         
-        selected_products = st.multiselect(
-            "Choisissez les produits principaux (dans l'ordre d'affichage souhaité) :",
-            options=unique_products,
-            help="L'ordre de sélection = ordre des sections dans le rapport final"
-        )
+        if len(selected_products) < len(unique_products):
+            st.write(f"**{len(selected_products) + 1}. Autres combinaisons** → Variants restants")
         
-        if selected_products:
-            st.write("### 📋 Aperçu de l'organisation")
-            for i, product in enumerate(selected_products, 1):
-                weight = product_weights.get(product, 0.0)
-                st.write(f"**{i}. {product}** ({weight:.3f}kg) → Tous les variants contenant ce produit")
-            
-            if len(selected_products) < len(unique_products):
-                st.write(f"**{len(selected_products) + 1}. Autres combinaisons** → Variants restants")
-            
-            # Étape 6: Génération
-            if st.button("🚀 Générer le rapport personnalisé", type="primary"):
-                with st.spinner("🔄 Génération en cours..."):
-                    
-                    # Organiser selon la configuration
-                    sections = organize_by_user_order(user_data, selected_products)
-                    
-                    # Créer le DataFrame final avec les poids configurés
-                    final_df = create_final_dataframe(sections, user_data, product_weights)
+        # Étape 6: Génération
+        if st.button("🚀 Générer le rapport personnalisé", type="primary"):
+            with st.spinner("🔄 Génération en cours..."):
+                
+                # Organiser selon la configuration
+                sections = organize_by_user_order(user_data, selected_products)
+                
+                # Créer le DataFrame final avec les poids configurés
+                final_df = create_final_dataframe(sections, user_data, product_weights)
                 
                 # Statistiques
                 st.write("## 📈 Résultats")
