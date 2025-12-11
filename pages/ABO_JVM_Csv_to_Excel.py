@@ -436,6 +436,7 @@ if uploaded_files:
                 "Delivery country code": "Delivery country code",
                 "Billing country": "Billing country",
                 "Delivery interval count": "Quantity",
+                "Line title": "Type d'abonnement",
                 "Magazines Restants": "Magazines Restants"
             }
             
@@ -456,7 +457,8 @@ if uploaded_files:
             final_columns = [
                 "Customer ID", "Delivery name", "Delivery address 1", "Delivery address 2",
                 "Delivery zip", "Delivery city", "Delivery province code",
-                "Delivery country code", "Billing country", "Quantity", "Magazines Restants"
+                "Delivery country code", "Billing country", "Quantity", 
+                "Type d'abonnement", "Magazines Restants"
             ]
             return df[final_columns]
 
