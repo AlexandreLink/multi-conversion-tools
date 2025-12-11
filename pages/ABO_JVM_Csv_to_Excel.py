@@ -95,24 +95,6 @@ def load_from_mongodb():
         # Conversion en DataFrame pandas
         df_youtube = pd.DataFrame(users)
         
-        # Filtrer les entrées de test Brice N Guessan dès le chargement
-        if 'deliveryName' in df_youtube.columns:
-            name_pattern = r"Brice N'?Guessan"
-            name_mask = df_youtube['deliveryName'].str.contains(name_pattern, case=False, na=False, regex=True)
-            
-            # Vérification pour l'email si présent
-            email_mask = pd.Series(False, index=df_youtube.index)
-            if 'username' in df_youtube.columns:
-                email_mask = df_youtube['username'].str.contains('bnguessan@linkdigitalspirit.com', case=False, na=False)
-            
-            # Combiner les masques
-            test_mask = name_mask | email_mask
-            test_count = test_mask.sum()
-            
-            if test_count > 0:
-                st.warning(f"⚠️ Suppression de {test_count} entrées de test (Brice N Guessan) des données YouTube.")
-                df_youtube = df_youtube[~test_mask]
-            
         # Uniformiser les noms de colonnes pour le format final attendu par les transporteurs
         column_mapping = {
             "customerID": "ID",
@@ -139,6 +121,9 @@ def load_from_mongodb():
         df_youtube['Source'] = 'YouTube'
         df_youtube['Status'] = 'ACTIVE'  # Tous les abonnés YouTube sont considérés comme actifs
         df_youtube['Created at'] = datetime.now()  # Date actuelle comme date de création
+        
+        # Ajouter Line title pour les abonnés YouTube (par défaut Abo 1 an)
+        df_youtube['Line title'] = 'Abonnement Extra - Engagement minimum de 12 mois'
         
         st.success(f"✅ **{len(df_youtube)} abonnés YouTube récupérés avec succès !**")
         return df_youtube
@@ -175,6 +160,78 @@ def remove_test_entries(df):
         # Supprimer les entrées de test sans afficher de détails
         df = df[~test_mask]
         st.info(f"ℹ️ {test_count} entrées de test ont été supprimées.")
+    
+    return df
+
+def calculate_remaining_magazines(df):
+    """Calcule le nombre de magazines restants pour chaque abonné"""
+    
+    # Vérifier que les colonnes nécessaires existent
+    if 'Line title' not in df.columns or 'Created at' not in df.columns:
+        st.warning("⚠️ Colonnes 'Line title' ou 'Created at' manquantes. Calcul des magazines restants impossible.")
+        df['Magazines Restants'] = None
+        return df
+    
+    # Déterminer le type d'abonnement et le nombre total de magazines
+    def get_total_magazines(line_title):
+        if pd.isna(line_title):
+            return 0
+        line_title = str(line_title).lower()
+        if 'flex' in line_title:
+            return 1  # Sans engagement
+        elif 'extra' in line_title or '1 an' in line_title or '12 mois' in line_title:
+            return 12  # Engagement 12 numéros
+        else:
+            return 0  # Type inconnu
+    
+    # Calculer le nombre de magazines déjà envoyés
+    # en tenant compte des envois le 5 de chaque mois
+    today = datetime.now()
+    
+    def calculate_sent_magazines(row):
+        try:
+            created_date = pd.to_datetime(row['Created at'])
+            
+            # Déterminer la date du premier envoi
+            # Si créé avant le 5, premier envoi = 5 du même mois
+            # Si créé après le 5, premier envoi = 5 du mois suivant
+            if created_date.day < 5:
+                first_delivery = datetime(created_date.year, created_date.month, 5)
+            else:
+                # Mois suivant
+                if created_date.month == 12:
+                    first_delivery = datetime(created_date.year + 1, 1, 5)
+                else:
+                    first_delivery = datetime(created_date.year, created_date.month + 1, 5)
+            
+            # Si le premier envoi n'a pas encore eu lieu, aucun magazine envoyé
+            if first_delivery > today:
+                return 0
+            
+            # Compter le nombre d'envois (5 de chaque mois) depuis le premier envoi
+            months_diff = (today.year - first_delivery.year) * 12 + (today.month - first_delivery.month)
+            
+            # Si on est après le 5 du mois actuel, on compte ce mois-ci aussi
+            if today.day >= 5:
+                magazines_sent = months_diff + 1
+            else:
+                magazines_sent = months_diff
+            
+            # Limiter au nombre total de magazines prévus
+            total_magazines = get_total_magazines(row['Line title'])
+            magazines_sent = min(magazines_sent, total_magazines)
+            
+            return magazines_sent
+        except Exception as e:
+            return 0
+    
+    # Appliquer les calculs
+    df['Total magazines'] = df['Line title'].apply(get_total_magazines)
+    df['Magazines envoyés'] = df.apply(calculate_sent_magazines, axis=1)
+    df['Magazines Restants'] = df['Total magazines'] - df['Magazines envoyés']
+    
+    # S'assurer que le nombre restant n'est jamais négatif
+    df['Magazines Restants'] = df['Magazines Restants'].apply(lambda x: max(0, x))
     
     return df
 
@@ -378,7 +435,8 @@ if uploaded_files:
                 "Delivery province code": "Delivery province code",
                 "Delivery country code": "Delivery country code",
                 "Billing country": "Billing country",
-                "Delivery interval count": "Quantity"
+                "Delivery interval count": "Quantity",
+                "Magazines Restants": "Magazines Restants"
             }
             
             # S'assurer que toutes les colonnes nécessaires existent
@@ -398,7 +456,7 @@ if uploaded_files:
             final_columns = [
                 "Customer ID", "Delivery name", "Delivery address 1", "Delivery address 2",
                 "Delivery zip", "Delivery city", "Delivery province code",
-                "Delivery country code", "Billing country", "Quantity"
+                "Delivery country code", "Billing country", "Quantity", "Magazines Restants"
             ]
             return df[final_columns]
 
@@ -410,6 +468,9 @@ if uploaded_files:
     
             # Combiner actifs et annulés
             all_df = pd.concat([active_df, valid_cancelled_df], ignore_index=True)
+            
+            # Calculer les magazines restants AVANT de préparer les fichiers finaux
+            all_df = calculate_remaining_magazines(all_df)
             
             # Vérification finale pour les entrées de test
             all_df = remove_test_entries(all_df)
@@ -433,6 +494,10 @@ if uploaded_files:
             st.write(f"📊 **Répartition des abonnements :**")
             st.write(f"- France : {len(france_df)} abonnements")
             st.write(f"- Étranger : {len(etranger_df)} abonnements")
+            
+            # Calculer le total des magazines restants
+            total_magazines_restants = all_df['Magazines Restants'].sum()
+            st.write(f"📦 **Total magazines restants à envoyer : {int(total_magazines_restants)}**")
             
             # Afficher un aperçu
             st.write(f"📌 **Données finales pour la France :**")
