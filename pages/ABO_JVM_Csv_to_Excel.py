@@ -422,6 +422,144 @@ if uploaded_files:
             # Par défaut, considérer comme étranger si on ne peut pas déterminer
             return False
         
+        # Fonction pour déterminer si une adresse est en Europe (hors France)
+        def is_europe(row):
+            if is_france(row):
+                return False
+            
+            # Liste des codes pays européens (hors France)
+            european_countries = [
+                'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'DE', 
+                'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 
+                'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'GB', 'CH', 'NO', 'IS'
+            ]
+            
+            if 'Delivery country code' in row and pd.notna(row['Delivery country code']):
+                return row['Delivery country code'].upper() in european_countries
+            
+            return False
+        
+        # S'assurer que valid_cancelled_df existe
+        if 'valid_cancelled_df' not in locals() and 'valid_cancelled_df' not in globals():
+            valid_cancelled_df = cancelled_df
+        
+        # Combiner actifs et annulés
+        all_subs = pd.concat([active_df, valid_cancelled_df], ignore_index=True)
+        
+        # Calculer les magazines restants
+        all_subs = calculate_remaining_magazines(all_subs)
+        
+        # Filtrer uniquement les abonnements "1 an"
+        if 'Line title' in all_subs.columns:
+            abo_1an_mask = all_subs['Line title'].str.contains('1 an', case=False, na=False, regex=True)
+            abo_1an = all_subs[abo_1an_mask]
+            
+            if not abo_1an.empty:
+                # Répartition géographique
+                abo_1an_france = abo_1an[abo_1an.apply(is_france, axis=1)]
+                abo_1an_europe = abo_1an[abo_1an.apply(is_europe, axis=1)]
+                abo_1an_monde = abo_1an[~abo_1an.apply(is_france, axis=1) & ~abo_1an.apply(is_europe, axis=1)]
+                
+                # Calcul des magazines restants par zone
+                magazines_france = int(abo_1an_france['Magazines Restants'].sum())
+                magazines_europe = int(abo_1an_europe['Magazines Restants'].sum())
+                magazines_monde = int(abo_1an_monde['Magazines Restants'].sum())
+                
+                # Prix par magazine selon la zone
+                prix_magazine_france = 54.96 / 12  # 4.58€ par magazine
+                prix_magazine_europe = 78.96 / 12  # 6.58€ par magazine
+                prix_magazine_monde = 114.96 / 12  # 9.58€ par magazine
+                
+                # Calcul des dettes par zone
+                dette_france = magazines_france * prix_magazine_france
+                dette_europe = magazines_europe * prix_magazine_europe
+                dette_monde = magazines_monde * prix_magazine_monde
+                dette_totale = dette_france + dette_europe + dette_monde
+                
+                # Affichage des statistiques globales
+                total_magazines_1an = magazines_france + magazines_europe + magazines_monde
+                nombre_abonnes_1an = len(abo_1an)
+                
+                st.write("### 📊 Vue d'ensemble")
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("👥 Nombre d'abonnés 1 an", nombre_abonnes_1an)
+                with col2:
+                    st.metric("📚 Total magazines à envoyer", total_magazines_1an)
+                with col3:
+                    st.metric("💰 Dette totale estimée", f"{dette_totale:.2f} €")
+                
+                # Répartition détaillée par zone
+                st.write("### 🌍 Répartition géographique et calcul de dette")
+                
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.write("#### 🇫🇷 France")
+                    st.metric("Abonnés", len(abo_1an_france))
+                    st.metric("Magazines restants", magazines_france)
+                    st.write(f"**Prix abo 1 an :** 54.96 €")
+                    st.write(f"**Prix/magazine :** {prix_magazine_france:.2f} €")
+                    st.write(f"**Calcul :** {magazines_france} × {prix_magazine_france:.2f} €")
+                    st.success(f"**Dette France : {dette_france:.2f} €**")
+                
+                with col2:
+                    st.write("#### 🇪🇺 Europe")
+                    st.metric("Abonnés", len(abo_1an_europe))
+                    st.metric("Magazines restants", magazines_europe)
+                    st.write(f"**Prix abo 1 an :** 78.96 €")
+                    st.write(f"**Prix/magazine :** {prix_magazine_europe:.2f} €")
+                    st.write(f"**Calcul :** {magazines_europe} × {prix_magazine_europe:.2f} €")
+                    st.success(f"**Dette Europe : {dette_europe:.2f} €**")
+                
+                with col3:
+                    st.write("#### 🌍 Monde")
+                    st.metric("Abonnés", len(abo_1an_monde))
+                    st.metric("Magazines restants", magazines_monde)
+                    st.write(f"**Prix abo 1 an :** 114.96 €")
+                    st.write(f"**Prix/magazine :** {prix_magazine_monde:.2f} €")
+                    st.write(f"**Calcul :** {magazines_monde} × {prix_magazine_monde:.2f} €")
+                    st.success(f"**Dette Monde : {dette_monde:.2f} €**")
+                
+                # Résumé final
+                st.write("---")
+                st.write("### 💼 Résumé financier")
+                summary_col1, summary_col2 = st.columns(2)
+                with summary_col1:
+                    st.info(f"""
+                    **Détail des dettes :**
+                    - France : {dette_france:.2f} €
+                    - Europe : {dette_europe:.2f} €
+                    - Monde : {dette_monde:.2f} €
+                    """)
+                with summary_col2:
+                    st.error(f"""
+                    **DETTE TOTALE**  
+                    ## {dette_totale:.2f} €
+                    """)
+                
+            else:
+                st.info("ℹ️ Aucun abonnement 1 an trouvé dans les données.")
+        else:
+            st.warning("⚠️ Colonne 'Line title' manquante. Impossible d'analyser les abonnements 1 an.")
+        
+        # Fonction pour déterminer si une adresse est en France
+        def is_france(row):
+            # Vérifier d'abord le pays de livraison s'il existe
+            if 'Delivery country code' in row and pd.notna(row['Delivery country code']):
+                return row['Delivery country code'].upper() == 'FR'
+            
+            # Vérifier le pays de livraison s'il existe
+            if 'Delivery country' in row and pd.notna(row['Delivery country']):
+                return 'FRANCE' in row['Delivery country'].upper()
+            
+            # Vérifier la méthode de livraison s'il existe
+            if 'Delivery Method' in row and pd.notna(row['Delivery Method']):
+                return 'FR' in row['Delivery Method'].upper()
+            
+            # Par défaut, considérer comme étranger si on ne peut pas déterminer
+            return False
+        
         # S'assurer que valid_cancelled_df existe
         if 'valid_cancelled_df' not in locals() and 'valid_cancelled_df' not in globals():
             valid_cancelled_df = cancelled_df
