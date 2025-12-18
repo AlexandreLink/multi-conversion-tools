@@ -402,9 +402,9 @@ if uploaded_files:
         with col2:
             st.metric("Abonnements annulés", len(cancelled_df))
         
-        # Option d'exportation
-        st.write("## 💾 Exportation des données")
-
+        # Section spéciale pour les abonnements 1 an
+        st.write("## 📦 Analyse Abonnements 1 an")
+        
         # Fonction pour déterminer si une adresse est en France
         def is_france(row):
             # Vérifier d'abord le pays de livraison s'il existe
@@ -421,6 +421,55 @@ if uploaded_files:
             
             # Par défaut, considérer comme étranger si on ne peut pas déterminer
             return False
+        
+        # S'assurer que valid_cancelled_df existe
+        if 'valid_cancelled_df' not in locals() and 'valid_cancelled_df' not in globals():
+            valid_cancelled_df = cancelled_df
+        
+        # Combiner actifs et annulés
+        all_subs = pd.concat([active_df, valid_cancelled_df], ignore_index=True)
+        
+        # Calculer les magazines restants
+        all_subs = calculate_remaining_magazines(all_subs)
+        
+        # Filtrer uniquement les abonnements "1 an"
+        if 'Line title' in all_subs.columns:
+            abo_1an_mask = all_subs['Line title'].str.contains('1 an', case=False, na=False, regex=True)
+            abo_1an = all_subs[abo_1an_mask]
+            
+            if not abo_1an.empty:
+                total_magazines_1an = abo_1an['Magazines Restants'].sum()
+                nombre_abonnes_1an = len(abo_1an)
+                
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("👥 Nombre d'abonnés 1 an", nombre_abonnes_1an)
+                with col2:
+                    st.metric("📚 Total magazines à envoyer", int(total_magazines_1an))
+                with col3:
+                    st.info("💡 Formule dette :  \n{} × (Prix abo 1 an / 12)".format(int(total_magazines_1an)))
+                
+                # Répartition France vs Étranger pour les abonnements 1 an
+                abo_1an_france = abo_1an[abo_1an.apply(is_france, axis=1)]
+                abo_1an_etranger = abo_1an[~abo_1an.apply(is_france, axis=1)]
+                
+                st.write("### 🌍 Répartition géographique (Abo 1 an uniquement)")
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.write("#### 🇫🇷 France")
+                    st.metric("Abonnés", len(abo_1an_france))
+                    st.metric("Magazines restants", int(abo_1an_france['Magazines Restants'].sum()))
+                with col2:
+                    st.write("#### 🌍 Étranger (Europe + Monde)")
+                    st.metric("Abonnés", len(abo_1an_etranger))
+                    st.metric("Magazines restants", int(abo_1an_etranger['Magazines Restants'].sum()))
+            else:
+                st.info("ℹ️ Aucun abonnement 1 an trouvé dans les données.")
+        else:
+            st.warning("⚠️ Colonne 'Line title' manquante. Impossible d'analyser les abonnements 1 an.")
+        
+        # Option d'exportation
+        st.write("## 💾 Exportation des données")
 
         # Fonction pour préparer le format final
         def prepare_final_files(df):
@@ -493,13 +542,9 @@ if uploaded_files:
             france_df = all_df[all_df.apply(is_france, axis=1)]
             etranger_df = all_df[~all_df.apply(is_france, axis=1)]
             
-            st.write(f"📊 **Répartition des abonnements :**")
+            st.write(f"📊 **Répartition des abonnements (tous types) :**")
             st.write(f"- France : {len(france_df)} abonnements")
             st.write(f"- Étranger : {len(etranger_df)} abonnements")
-            
-            # Calculer le total des magazines restants
-            total_magazines_restants = all_df['Magazines Restants'].sum()
-            st.write(f"📦 **Total magazines restants à envoyer : {int(total_magazines_restants)}**")
             
             # Afficher un aperçu
             st.write(f"📌 **Données finales pour la France :**")
