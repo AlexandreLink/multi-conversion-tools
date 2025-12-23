@@ -371,6 +371,7 @@ def process_csv(uploaded_files, include_youtube=False):
         exclusion_patterns = [
             'Remboursement',
             'Arrêt abonnement',
+            'Arrêt d\'abonnement',
             'changer d\'abonnement',
             'Erreur du client',
             'résilier son abonnement',
