@@ -371,7 +371,6 @@ def process_csv(uploaded_files, include_youtube=False):
         exclusion_patterns = [
             'Remboursement',
             'Arrêt abonnement',
-            'Arrêt d\'abonnement',
             'changer d\'abonnement',
             'Erreur du client',
             'résilier son abonnement',
@@ -687,6 +686,12 @@ if uploaded_files:
                     # Calculer la dette individuelle
                     debt_df['Dette (Magazine × Prix)'] = debt_df['Magazines Restants'] * debt_df['Prix par magazine']
                     
+                    # Calculer les totaux pour les colonnes de synthèse
+                    total_dette_france = debt_df[debt_df['Zone'] == 'France']['Dette (Magazine × Prix)'].sum()
+                    total_dette_europe = debt_df[debt_df['Zone'] == 'Europe']['Dette (Magazine × Prix)'].sum()
+                    total_dette_monde = debt_df[debt_df['Zone'] == 'Monde']['Dette (Magazine × Prix)'].sum()
+                    total_dette_globale = total_dette_france + total_dette_europe + total_dette_monde
+                    
                     # Sélectionner et réorganiser les colonnes pour le fichier final
                     debt_report = debt_df[[
                         'Customer name',
@@ -707,6 +712,18 @@ if uploaded_files:
                         'Dette Totale (€)'
                     ]
                     
+                    # Ajouter les colonnes de synthèse (vides sauf première ligne)
+                    debt_report['Dette France (€)'] = ''
+                    debt_report['Dette Europe (€)'] = ''
+                    debt_report['Dette Monde (€)'] = ''
+                    debt_report['Dette Totale Globale (€)'] = ''
+                    
+                    # Remplir uniquement la première ligne avec les totaux
+                    debt_report.loc[0, 'Dette France (€)'] = round(total_dette_france, 2)
+                    debt_report.loc[0, 'Dette Europe (€)'] = round(total_dette_europe, 2)
+                    debt_report.loc[0, 'Dette Monde (€)'] = round(total_dette_monde, 2)
+                    debt_report.loc[0, 'Dette Totale Globale (€)'] = round(total_dette_globale, 2)
+                    
                     # Arrondir les prix à 2 décimales
                     debt_report['Prix Abonnement 1 an (€)'] = debt_report['Prix Abonnement 1 an (€)'].round(2)
                     debt_report['Prix par Magazine (€)'] = debt_report['Prix par Magazine (€)'].round(2)
@@ -720,7 +737,7 @@ if uploaded_files:
                     # Statistiques rapides
                     col1, col2, col3 = st.columns(3)
                     with col1:
-                        st.metric("Dette totale", f"{debt_report['Dette Totale (€)'].sum():.2f} €")
+                        st.metric("Dette totale", f"{total_dette_globale:.2f} €")
                     with col2:
                         st.metric("Dette moyenne", f"{debt_report['Dette Totale (€)'].mean():.2f} €")
                     with col3:
@@ -739,8 +756,15 @@ if uploaded_files:
                 st.info(f"ℹ️ {test_count} entrées de test supplémentaires ont été éliminées.")
             
             # Séparer par pays
-            france_df = all_df_export[all_df_export.apply(is_france, axis=1)]
-            etranger_df = all_df_export[~all_df_export.apply(is_france, axis=1)]
+            france_df = all_df_export[all_df_export.apply(is_france, axis=1)].copy()
+            etranger_df = all_df_export[~all_df_export.apply(is_france, axis=1)].copy()
+            
+            # Ajouter les colonnes de synthèse (vides sauf première ligne)
+            france_df['Nombre d\'abonnés actifs France'] = ''
+            france_df.loc[france_df.index[0], 'Nombre d\'abonnés actifs France'] = len(france_df)
+            
+            etranger_df['Nombre d\'abonnés actifs Étranger'] = ''
+            etranger_df.loc[etranger_df.index[0], 'Nombre d\'abonnés actifs Étranger'] = len(etranger_df)
             
             st.write(f"📊 **Répartition des abonnements (tous types) :**")
             st.write(f"- France : {len(france_df)} abonnements")
