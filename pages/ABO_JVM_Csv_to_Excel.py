@@ -365,16 +365,38 @@ def process_csv(uploaded_files, include_youtube=False):
     cancelled_df = remove_test_entries(cancelled_df)
 
     # Filtrage spécifique pour les abonnements annulés
-    # D'abord, exclure les abonnements remboursés
+    # Exclure les abonnements avec motifs d'annulation spécifiques
     if 'Cancellation note' in cancelled_df.columns:
-        # Compter les abonnements remboursés
-        refund_mask = cancelled_df['Cancellation note'].str.contains('Remboursement', case=False, na=False)
-        refund_count = refund_mask.sum()
+        # Liste des motifs d'annulation à exclure
+        exclusion_patterns = [
+            'Remboursement',
+            'Arrêt abonnement',
+            'changer d\'abonnement',
+            'Erreur du client',
+            'résilier son abonnement',
+            'annuler son abonnement',
+            'pris deux fois',
+            'déjà un autre abonnement',
+            'demande du client',
+            'commande frauduleuse',
+            'Test',
+            'opté pour un abonnement',
+            'ne pas renouveler',
+            'souscrit deux fois',
+            'Abonnement en double'
+        ]
         
-        if refund_count > 0:
-            # Filtrer pour ne garder que les abonnements non remboursés
-            cancelled_df = cancelled_df[~refund_mask]
-            st.info(f"ℹ️ {refund_count} abonnements remboursés ont été exclus.")
+        # Créer le pattern regex (| = OU)
+        pattern = '|'.join(exclusion_patterns)
+        
+        # Filtrer avec case=False pour ignorer majuscules/minuscules
+        exclusion_mask = cancelled_df['Cancellation note'].str.contains(pattern, case=False, na=False, regex=True)
+        exclusion_count = exclusion_mask.sum()
+        
+        if exclusion_count > 0:
+            # Filtrer pour ne garder que les abonnements sans motif d'exclusion
+            cancelled_df = cancelled_df[~exclusion_mask]
+            st.info(f"ℹ️ {exclusion_count} abonnements annulés ont été exclus (motifs d'annulation).")
     
     # Ensuite, continuer avec le filtrage par date
     try:
@@ -588,7 +610,7 @@ if uploaded_files:
         # Option d'exportation
         st.write("## 💾 Exportation des données")
 
-        # Fonction pour préparer le format final
+        # Fonction pour préparer le format final (SANS Type d'abonnement et Magazines Restants)
         def prepare_final_files(df):
             """Prépare le fichier final avec les colonnes nécessaires et renommées."""
             column_mapping = {
@@ -601,9 +623,7 @@ if uploaded_files:
                 "Delivery province code": "Delivery province code",
                 "Delivery country code": "Delivery country code",
                 "Billing country": "Billing country",
-                "Delivery interval count": "Quantity",
-                "Line title": "Type d'abonnement",
-                "Magazines Restants": "Magazines Restants"
+                "Delivery interval count": "Quantity"
             }
             
             # S'assurer que toutes les colonnes nécessaires existent
@@ -623,8 +643,7 @@ if uploaded_files:
             final_columns = [
                 "Customer ID", "Delivery name", "Delivery address 1", "Delivery address 2",
                 "Delivery zip", "Delivery city", "Delivery province code",
-                "Delivery country code", "Billing country", "Quantity", 
-                "Type d'abonnement", "Magazines Restants"
+                "Delivery country code", "Billing country", "Quantity"
             ]
             return df[final_columns]
 
@@ -643,21 +662,84 @@ if uploaded_files:
             # Vérification finale pour les entrées de test
             all_df = remove_test_entries(all_df)
             
-            # Préparer le format final
-            all_df = prepare_final_files(all_df)
+            # Créer le fichier spécial pour les abonnements 1 an avec calcul de dette
+            if 'Line title' in all_df.columns:
+                # Filtrer uniquement les abonnements 1 an
+                abo_1an_mask = all_df['Line title'].str.contains('1 an', case=False, na=False, regex=True)
+                debt_df = all_df[abo_1an_mask].copy()
+                
+                if not debt_df.empty:
+                    # Fonction pour déterminer le prix selon la zone
+                    def get_price_info(row):
+                        if is_france(row):
+                            return 54.96, 54.96 / 12, 'France'
+                        elif is_europe(row):
+                            return 78.96, 78.96 / 12, 'Europe'
+                        else:
+                            return 114.96, 114.96 / 12, 'Monde'
+                    
+                    # Calculer les prix et la dette pour chaque ligne
+                    debt_df[['Prix abo 1 an', 'Prix par magazine', 'Zone']] = debt_df.apply(
+                        lambda row: pd.Series(get_price_info(row)), axis=1
+                    )
+                    
+                    # Calculer la dette individuelle
+                    debt_df['Dette (Magazine × Prix)'] = debt_df['Magazines Restants'] * debt_df['Prix par magazine']
+                    
+                    # Sélectionner et réorganiser les colonnes pour le fichier final
+                    debt_report = debt_df[[
+                        'Customer name',
+                        'Zone',
+                        'Magazines Restants',
+                        'Prix abo 1 an',
+                        'Prix par magazine',
+                        'Dette (Magazine × Prix)'
+                    ]].copy()
+                    
+                    # Renommer pour plus de clarté
+                    debt_report.columns = [
+                        'Nom Prénom',
+                        'Zone',
+                        'Magazines Restants',
+                        'Prix Abonnement 1 an (€)',
+                        'Prix par Magazine (€)',
+                        'Dette Totale (€)'
+                    ]
+                    
+                    # Arrondir les prix à 2 décimales
+                    debt_report['Prix Abonnement 1 an (€)'] = debt_report['Prix Abonnement 1 an (€)'].round(2)
+                    debt_report['Prix par Magazine (€)'] = debt_report['Prix par Magazine (€)'].round(2)
+                    debt_report['Dette Totale (€)'] = debt_report['Dette Totale (€)'].round(2)
+                    
+                    # Afficher un aperçu
+                    st.write("## 💰 Rapport de Dette - Abonnements 1 an")
+                    st.write(f"📊 **{len(debt_report)} abonnés 1 an avec dette calculée**")
+                    st.dataframe(debt_report)
+                    
+                    # Statistiques rapides
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Dette totale", f"{debt_report['Dette Totale (€)'].sum():.2f} €")
+                    with col2:
+                        st.metric("Dette moyenne", f"{debt_report['Dette Totale (€)'].mean():.2f} €")
+                    with col3:
+                        st.metric("Total magazines", int(debt_report['Magazines Restants'].sum()))
+            
+            # Préparer le format final (sans Type d'abonnement et Magazines Restants)
+            all_df_export = prepare_final_files(all_df)
 
             # Vérification ultime des entrées de test
             name_pattern = r"Brice N'?Guessan"
-            mask = all_df['Delivery name'].str.contains(name_pattern, case=False, na=False, regex=True)
+            mask = all_df_export['Delivery name'].str.contains(name_pattern, case=False, na=False, regex=True)
             test_count = mask.sum()
             if test_count > 0:
                 # Les supprimer
-                all_df = all_df[~mask]
+                all_df_export = all_df_export[~mask]
                 st.info(f"ℹ️ {test_count} entrées de test supplémentaires ont été éliminées.")
             
             # Séparer par pays
-            france_df = all_df[all_df.apply(is_france, axis=1)]
-            etranger_df = all_df[~all_df.apply(is_france, axis=1)]
+            france_df = all_df_export[all_df_export.apply(is_france, axis=1)]
+            etranger_df = all_df_export[~all_df_export.apply(is_france, axis=1)]
             
             st.write(f"📊 **Répartition des abonnements (tous types) :**")
             st.write(f"- France : {len(france_df)} abonnements")
@@ -670,8 +752,8 @@ if uploaded_files:
             st.write(f"📌 **Données finales pour l'étranger :**")
             st.dataframe(etranger_df)
 
-        # Colonnes d'export 
-        col1, col2 = st.columns(2)
+        # Colonnes d'export (3 colonnes maintenant)
+        col1, col2, col3 = st.columns(3)
 
         with col1:
             st.write("### 🇫🇷 Abonnements France")
@@ -720,3 +802,30 @@ if uploaded_files:
                 )
                 
                 st.success(f"✅ Fichier Étranger prêt à être téléchargé ({len(etranger_df)} abonnements)")
+
+        with col3:
+            st.write("### 💰 Rapport Dette 1 an")
+            if 'debt_report' in locals():
+                if st.button("Exporter le rapport de dette"):
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    
+                    # Définir le nom du fichier
+                    debt_filename = f"{file_prefix}_dette_1an_{timestamp}.xlsx" if file_prefix else f"dette_1an_{timestamp}.xlsx"
+                    
+                    # Créer un buffer pour stocker le fichier Excel
+                    buffer = io.BytesIO()
+                    with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+                        debt_report.to_excel(writer, index=False, sheet_name='Dette Abonnements 1 an')
+                    buffer.seek(0)
+                    
+                    # Proposer le téléchargement
+                    st.download_button(
+                        label="📥 Télécharger le rapport de dette",
+                        data=buffer,
+                        file_name=debt_filename,
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+                    
+                    st.success(f"✅ Rapport de dette prêt ({len(debt_report)} abonnés)")
+            else:
+                st.info("ℹ️ Aucun abonnement 1 an trouvé pour le rapport de dette")
