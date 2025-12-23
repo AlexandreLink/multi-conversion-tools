@@ -6,7 +6,6 @@ import os
 import re
 from dotenv import load_dotenv
 import io
-from dateutil.relativedelta import relativedelta
 
 # Chargement des variables d'environnement
 load_dotenv()
@@ -126,9 +125,6 @@ def load_from_mongodb():
         # Ajouter Line title pour les abonnés YouTube (par défaut Abo 1 an)
         df_youtube['Line title'] = 'Abonnement Extra - Engagement minimum de 12 mois'
         
-        # Ajouter Next order date pour les abonnés YouTube (dans 12 mois)
-        df_youtube['Next order date'] = datetime.now() + relativedelta(months=12)
-        
         st.success(f"✅ **{len(df_youtube)} abonnés YouTube récupérés avec succès !**")
         return df_youtube
         
@@ -168,11 +164,11 @@ def remove_test_entries(df):
     return df
 
 def calculate_remaining_magazines(df):
-    """Calcule le nombre de magazines restants pour chaque abonné basé sur Next order date"""
+    """Calcule le nombre de magazines restants pour chaque abonné"""
     
     # Vérifier que les colonnes nécessaires existent
-    if 'Line title' not in df.columns:
-        st.warning("⚠️ Colonne 'Line title' manquante. Calcul des magazines restants impossible.")
+    if 'Line title' not in df.columns or 'Created at' not in df.columns:
+        st.warning("⚠️ Colonnes 'Line title' ou 'Created at' manquantes. Calcul des magazines restants impossible.")
         df['Magazines Restants'] = None
         return df
     
@@ -188,83 +184,45 @@ def calculate_remaining_magazines(df):
         else:
             return 0  # Type inconnu
     
+    # Calculer le nombre de magazines déjà envoyés
+    # en tenant compte des envois le 5 de chaque mois
     today = datetime.now()
     
     def calculate_sent_magazines(row):
         try:
-            total_magazines = get_total_magazines(row['Line title'])
+            created_date = pd.to_datetime(row['Created at'])
             
-            # Pour les abonnements Flex, utiliser Created at
-            if total_magazines == 1:
-                if 'Created at' in row and pd.notna(row['Created at']):
-                    created_date = pd.to_datetime(row['Created at'])
-                    
-                    # Déterminer la date du premier envoi
-                    if created_date.day < 5:
-                        first_delivery = datetime(created_date.year, created_date.month, 5)
-                    else:
-                        if created_date.month == 12:
-                            first_delivery = datetime(created_date.year + 1, 1, 5)
-                        else:
-                            first_delivery = datetime(created_date.year, created_date.month + 1, 5)
-                    
-                    # Si le premier envoi n'a pas encore eu lieu
-                    if first_delivery > today:
-                        return 0
-                    else:
-                        return 1  # Flex = 1 seul magazine
-                else:
-                    return 0
-            
-            # Pour les abonnements 12 mois (Extra et 1 an), utiliser Next order date
-            elif total_magazines == 12:
-                if 'Next order date' not in row or pd.isna(row['Next order date']):
-                    # Si pas de Next order date, utiliser Created at comme fallback
-                    if 'Created at' in row and pd.notna(row['Created at']):
-                        created_date = pd.to_datetime(row['Created at'])
-                        cycle_start = created_date
-                    else:
-                        return 0
-                else:
-                    # Convertir Next order date
-                    next_order_date = pd.to_datetime(row['Next order date'])
-                    
-                    # Calculer le début du cycle actuel (12 mois avant next_order_date)
-                    cycle_start = next_order_date - relativedelta(months=12)
-                
-                # Déterminer la date du premier envoi du cycle actuel
-                if cycle_start.day < 5:
-                    first_delivery = datetime(cycle_start.year, cycle_start.month, 5)
-                else:
-                    # Mois suivant
-                    if cycle_start.month == 12:
-                        first_delivery = datetime(cycle_start.year + 1, 1, 5)
-                    else:
-                        first_delivery = datetime(cycle_start.year, cycle_start.month + 1, 5)
-                
-                # Si le premier envoi n'a pas encore eu lieu
-                if first_delivery > today:
-                    return 0
-                
-                # Compter le nombre d'envois depuis le premier envoi du cycle actuel
-                months_diff = (today.year - first_delivery.year) * 12 + (today.month - first_delivery.month)
-                
-                # Si on est après le 5 du mois actuel
-                if today.day >= 5:
-                    magazines_sent = months_diff + 1
-                else:
-                    magazines_sent = months_diff
-                
-                # Limiter au nombre total de magazines du cycle
-                magazines_sent = min(magazines_sent, total_magazines)
-                
-                return magazines_sent
-            
+            # Déterminer la date du premier envoi
+            # Si créé avant le 5, premier envoi = 5 du même mois
+            # Si créé après le 5, premier envoi = 5 du mois suivant
+            if created_date.day < 5:
+                first_delivery = datetime(created_date.year, created_date.month, 5)
             else:
+                # Mois suivant
+                if created_date.month == 12:
+                    first_delivery = datetime(created_date.year + 1, 1, 5)
+                else:
+                    first_delivery = datetime(created_date.year, created_date.month + 1, 5)
+            
+            # Si le premier envoi n'a pas encore eu lieu, aucun magazine envoyé
+            if first_delivery > today:
                 return 0
-                
+            
+            # Compter le nombre d'envois (5 de chaque mois) depuis le premier envoi
+            months_diff = (today.year - first_delivery.year) * 12 + (today.month - first_delivery.month)
+            
+            # Si on est après le 5 du mois actuel, on compte ce mois-ci aussi
+            if today.day >= 5:
+                magazines_sent = months_diff + 1
+            else:
+                magazines_sent = months_diff
+            
+            # Limiter au nombre total de magazines prévus
+            total_magazines = get_total_magazines(row['Line title'])
+            magazines_sent = min(magazines_sent, total_magazines)
+            
+            return magazines_sent
         except Exception as e:
-            st.warning(f"Erreur lors du calcul pour une ligne : {e}")
             return 0
     
     # Appliquer les calculs
@@ -313,9 +271,6 @@ def process_csv(uploaded_files, include_youtube=False):
     # Utiliser notre fonction robuste de conversion de dates
     original_count = len(df)
     df['Created at'] = robust_date_conversion(df['Created at'])
-    
-    # Convertir aussi Next order date
-    df['Next order date'] = robust_date_conversion(df['Next order date'])
     
     # Supprimer les lignes avec des dates invalides
     df = df.dropna(subset=['Created at'])
@@ -378,6 +333,9 @@ def process_csv(uploaded_files, include_youtube=False):
     
     # Ensuite, continuer avec le filtrage par date
     try:
+        # Convertir la colonne Next order date sans fuseau horaire
+        cancelled_df['Next order date'] = pd.to_datetime(cancelled_df['Next order date'], errors='coerce', utc=True)
+        
         # S'assurer que les dates n'ont pas de fuseau horaire
         if cancelled_df['Next order date'].dt.tz is not None:
             cancelled_df['Next order date'] = cancelled_df['Next order date'].dt.tz_localize(None)
@@ -580,6 +538,69 @@ if uploaded_files:
                     ## {dette_totale:.2f} €
                     """)
                 
+            else:
+                st.info("ℹ️ Aucun abonnement 1 an trouvé dans les données.")
+        else:
+            st.warning("⚠️ Colonne 'Line title' manquante. Impossible d'analyser les abonnements 1 an.")
+        
+        # Fonction pour déterminer si une adresse est en France
+        def is_france(row):
+            # Vérifier d'abord le pays de livraison s'il existe
+            if 'Delivery country code' in row and pd.notna(row['Delivery country code']):
+                return row['Delivery country code'].upper() == 'FR'
+            
+            # Vérifier le pays de livraison s'il existe
+            if 'Delivery country' in row and pd.notna(row['Delivery country']):
+                return 'FRANCE' in row['Delivery country'].upper()
+            
+            # Vérifier la méthode de livraison s'il existe
+            if 'Delivery Method' in row and pd.notna(row['Delivery Method']):
+                return 'FR' in row['Delivery Method'].upper()
+            
+            # Par défaut, considérer comme étranger si on ne peut pas déterminer
+            return False
+        
+        # S'assurer que valid_cancelled_df existe
+        if 'valid_cancelled_df' not in locals() and 'valid_cancelled_df' not in globals():
+            valid_cancelled_df = cancelled_df
+        
+        # Combiner actifs et annulés
+        all_subs = pd.concat([active_df, valid_cancelled_df], ignore_index=True)
+        
+        # Calculer les magazines restants
+        all_subs = calculate_remaining_magazines(all_subs)
+        
+        # Filtrer uniquement les abonnements "1 an"
+        if 'Line title' in all_subs.columns:
+            abo_1an_mask = all_subs['Line title'].str.contains('1 an', case=False, na=False, regex=True)
+            abo_1an = all_subs[abo_1an_mask]
+            
+            if not abo_1an.empty:
+                total_magazines_1an = abo_1an['Magazines Restants'].sum()
+                nombre_abonnes_1an = len(abo_1an)
+                
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("👥 Nombre d'abonnés 1 an", nombre_abonnes_1an)
+                with col2:
+                    st.metric("📚 Total magazines à envoyer", int(total_magazines_1an))
+                with col3:
+                    st.info("💡 Formule dette :  \n{} × (Prix abo 1 an / 12)".format(int(total_magazines_1an)))
+                
+                # Répartition France vs Étranger pour les abonnements 1 an
+                abo_1an_france = abo_1an[abo_1an.apply(is_france, axis=1)]
+                abo_1an_etranger = abo_1an[~abo_1an.apply(is_france, axis=1)]
+                
+                st.write("### 🌍 Répartition géographique (Abo 1 an uniquement)")
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.write("#### 🇫🇷 France")
+                    st.metric("Abonnés", len(abo_1an_france))
+                    st.metric("Magazines restants", int(abo_1an_france['Magazines Restants'].sum()))
+                with col2:
+                    st.write("#### 🌍 Étranger (Europe + Monde)")
+                    st.metric("Abonnés", len(abo_1an_etranger))
+                    st.metric("Magazines restants", int(abo_1an_etranger['Magazines Restants'].sum()))
             else:
                 st.info("ℹ️ Aucun abonnement 1 an trouvé dans les données.")
         else:
