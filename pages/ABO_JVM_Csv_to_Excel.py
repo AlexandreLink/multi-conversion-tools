@@ -719,10 +719,10 @@ if uploaded_files:
                     debt_report['Dette Totale Globale (€)'] = ''
                     
                     # Remplir uniquement la première ligne avec les totaux
-                    debt_report.loc[0, 'Dette France (€)'] = round(total_dette_france, 2)
-                    debt_report.loc[0, 'Dette Europe (€)'] = round(total_dette_europe, 2)
-                    debt_report.loc[0, 'Dette Monde (€)'] = round(total_dette_monde, 2)
-                    debt_report.loc[0, 'Dette Totale Globale (€)'] = round(total_dette_globale, 2)
+                    debt_report.iloc[0, debt_report.columns.get_loc('Dette France (€)')] = round(total_dette_france, 2)
+                    debt_report.iloc[0, debt_report.columns.get_loc('Dette Europe (€)')] = round(total_dette_europe, 2)
+                    debt_report.iloc[0, debt_report.columns.get_loc('Dette Monde (€)')] = round(total_dette_monde, 2)
+                    debt_report.iloc[0, debt_report.columns.get_loc('Dette Totale Globale (€)')] = round(total_dette_globale, 2)
                     
                     # Arrondir les prix à 2 décimales
                     debt_report['Prix Abonnement 1 an (€)'] = debt_report['Prix Abonnement 1 an (€)'].round(2)
