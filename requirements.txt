@@ -7,3 +7,4 @@ pandas
 pymongo
 python-dotenv
 xlsxwriter
+python-dateutil
