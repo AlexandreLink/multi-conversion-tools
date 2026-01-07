@@ -761,13 +761,6 @@ if uploaded_files:
             france_df = all_df_export[all_df_export.apply(is_france, axis=1)].copy()
             etranger_df = all_df_export[~all_df_export.apply(is_france, axis=1)].copy()
             
-            # Ajouter les colonnes de synthèse (vides sauf première ligne)
-            france_df['Nombre d\'abonnés actifs France'] = ''
-            france_df.loc[france_df.index[0], 'Nombre d\'abonnés actifs France'] = len(france_df)
-            
-            etranger_df['Nombre d\'abonnés actifs Étranger'] = ''
-            etranger_df.loc[etranger_df.index[0], 'Nombre d\'abonnés actifs Étranger'] = len(etranger_df)
-            
             st.write(f"📊 **Répartition des abonnements (tous types) :**")
             st.write(f"- France : {len(france_df)} abonnements")
             st.write(f"- Étranger : {len(etranger_df)} abonnements")
