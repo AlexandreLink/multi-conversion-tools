@@ -715,10 +715,10 @@ if uploaded_files:
                     ]
                     
                     # Ajouter les colonnes de synthèse (vides sauf première ligne)
-                    debt_report['Dette France (€)'] = ''
-                    debt_report['Dette Europe (€)'] = ''
-                    debt_report['Dette Monde (€)'] = ''
-                    debt_report['Dette Totale Globale (€)'] = ''
+                    debt_report['Dette France (€)'] = None
+                    debt_report['Dette Europe (€)'] = None
+                    debt_report['Dette Monde (€)'] = None
+                    debt_report['Dette Totale Globale (€)'] = None
                     
                     # Remplir uniquement la première ligne avec les totaux
                     debt_report.iloc[0, debt_report.columns.get_loc('Dette France (€)')] = round(total_dette_france, 2)
